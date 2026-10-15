@@ -14,9 +14,9 @@
 # Built binary
 aether_ops
 
-# Config (contains secrets)
-config.yaml
-config.yml
+# Local configuration overrides (contains secrets)
+config.local.yaml
+config.local.yml
 
 # Runtime data and local secrets
 _run/

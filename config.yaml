@@ -1,0 +1,15 @@
+server:
+  port: "18080"
+  login_path: "/home"
+database:
+  host: "192.168.5.4"
+  port: 5432
+  user: "aether"
+  password: "admin"
+  dbname: "aether_ops"
+  sslmode: "disable"
+  max_conns: 20
+work_dir:
+  path: "_run/work"
+  application_path: "_run/work/applications"
+  ci_path: "_run/work/ci"
