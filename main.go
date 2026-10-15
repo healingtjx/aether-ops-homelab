@@ -21,8 +21,6 @@ import (
 	tpl "aether_ops/internal/templates"
 )
 
-const loginPath = "/bs"
-
 //go:embed web/templates/*
 var templateFS embed.FS
 
@@ -70,10 +68,10 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	handlers.NewAuthHandler(pool, renderer, loginPath).Register(r)
+	handlers.NewAuthHandler(pool, renderer, cfg.Server.LoginPath).Register(r)
 
 	r.Group(func(r chi.Router) {
-		r.Use(mw.Authenticate(pool, loginPath))
+		r.Use(mw.Authenticate(pool, cfg.Server.LoginPath))
 
 		handlers.NewProjectHandler(pool, renderer).Register(r)
 		handlers.NewApplicationHandler(pool, renderer, cfg.WorkDir.ApplicationPath).Register(r)

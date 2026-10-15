@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-REMOTE_HOST="${REMOTE_HOST:-172.16.8.202}"
-REMOTE_USER="${REMOTE_USER:-tjc}"
-REMOTE_PASSWORD="${REMOTE_PASSWORD:-tangjiaxing}"
+REMOTE_HOST="${REMOTE_HOST:-192.168.5.4}"
+REMOTE_USER="${REMOTE_USER:-tjx}"
+REMOTE_PASSWORD="${REMOTE_PASSWORD:-Brtjx19981014@}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/aether}"
 REMOTE_BIN="${REMOTE_BIN:-${REMOTE_DIR}/bin/aether_ops}"
 LOCAL_BIN="${LOCAL_BIN:-${ROOT_DIR}/dist/aether_ops-linux-amd64}"
@@ -24,8 +24,8 @@ usage() {
   3. 不覆盖 config.yaml、work、migrations、脚本等其它文件
 
 环境变量:
-  REMOTE_HOST      目标服务器，默认 172.16.8.202
-  REMOTE_USER      SSH 用户，默认 tjc
+  REMOTE_HOST      目标服务器，默认 192.168.5.4
+  REMOTE_USER      SSH 用户，默认 tjx
   REMOTE_PASSWORD  SSH 密码，默认 tangjiaxing
   REMOTE_DIR       远端应用目录，默认 /opt/aether
   REMOTE_BIN       远端程序路径，默认 /opt/aether/bin/aether_ops
