@@ -1,0 +1,40 @@
+{
+  "before_upload": [
+    {
+      "name": "校验并查看当前 Compose 镜像版本",
+      "commands": [
+        "cd ${REMOTE_DIR}",
+        "echo \"目标 Compose: ${REMOTE_DIR}/${COMPOSE_FILE}\"",
+        "test -f ${COMPOSE_FILE}",
+        "grep -q '^  ${SERVICE_NAME}:' ${COMPOSE_FILE}",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | grep -q '^[[:space:]]*image:[[:space:]]*'",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | sed -n 's/^[[:space:]]*image:[[:space:]]*//p' | head -n 1 | sed 's/^\"//;s/\"$//;s/^/当前镜像: /'",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | sed -n 's/^[[:space:]]*image:[[:space:]]*//p' | head -n 1 | sed 's/^\"//;s/\"$//' | rev | cut -d: -f1 | rev | sed 's/^/当前版本: /'"
+      ]
+    }
+  ],
+  "after_upload": [
+    {
+      "name": "更新 Compose service 镜像版本",
+      "commands": [
+        "cd ${REMOTE_DIR}",
+        "sed '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/ s#^\\([[:space:]]*image:[[:space:]]*\\).*#\\1${IMAGE_REF}#' ${COMPOSE_FILE} > /tmp/aether_ops_compose_update.yml",
+        "cat /tmp/aether_ops_compose_update.yml > ${COMPOSE_FILE}",
+        "rm -f /tmp/aether_ops_compose_update.yml",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | sed -n 's/^[[:space:]]*image:[[:space:]]*//p' | head -n 1 | sed 's/^\"//;s/\"$//' | grep -Fx '${IMAGE_REF}'",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | sed -n 's/^[[:space:]]*image:[[:space:]]*//p' | head -n 1 | sed 's/^\"//;s/\"$//;s/^/新镜像: /'",
+        "sed -n '/^  ${SERVICE_NAME}:/,/^  [^[:space:]]/p' ${COMPOSE_FILE} | sed -n 's/^[[:space:]]*image:[[:space:]]*//p' | head -n 1 | sed 's/^\"//;s/\"$//' | rev | cut -d: -f1 | rev | sed 's/^/新版本: /'"
+      ]
+    }
+  ],
+  "restart": [
+    {
+      "name": "重启 Compose service",
+      "commands": [
+        "cd ${REMOTE_DIR}",
+        "docker compose -f ${COMPOSE_FILE} up -d ${SERVICE_NAME}",
+        "docker compose -f ${COMPOSE_FILE} ps ${SERVICE_NAME}"
+      ]
+    }
+  ]
+}

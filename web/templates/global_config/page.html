@@ -1,0 +1,19 @@
+{{define "global_config_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>全局配置</h1>
+<section class="settings-section">
+    <h2>工具路径</h2>
+    {{template "global_config_tools_form" .}}
+</section>
+</main>
+</div>
+{{template "modal"}}
+</body>
+</html>
+{{end}}

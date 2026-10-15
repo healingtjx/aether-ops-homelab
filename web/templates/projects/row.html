@@ -1,0 +1,13 @@
+{{define "project_row"}}
+<tr id="project-{{.ID}}">
+    <td>{{.Name}}</td>
+    <td>{{or "-" .Description}}</td>
+    <td>
+        <div class="actions">
+            <button onclick="openEditModal('/projects/{{.ID}}/edit')">编辑</button>
+            <button class="danger" hx-delete="/projects/{{.ID}}" hx-target="closest tr" hx-swap="outerHTML"
+                    hx-confirm="确定要删除项目&quot;{{.Name}}&quot;及其所有应用吗？">删除</button>
+        </div>
+    </td>
+</tr>
+{{end}}

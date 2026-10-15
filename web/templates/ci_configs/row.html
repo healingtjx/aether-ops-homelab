@@ -1,0 +1,67 @@
+{{define "ci_config_group"}}
+<tr class="ci-config-group-row expanded">
+    <td>
+        <button type="button" class="ci-config-toggle" aria-expanded="true" onclick="toggleCIConfigGroup(this)">
+            <span class="chevron">›</span>
+        </button>
+    </td>
+    <td>{{.ProjectName}}</td>
+    <td>
+        <div>{{.ApplicationName}} <span class="badge">{{len .Configs}} 个模块</span></div>
+        <div class="ci-config-module-path" title="{{.GitURL}}">{{.GitURL}}</div>
+    </td>
+    <td style="color:#868e96;font-size:0.8rem">按模块显示</td>
+    <td style="color:#868e96;font-size:0.8rem">按模块显示</td>
+    <td colspan="3" style="color:#868e96;font-size:0.8rem">点击展开模块</td>
+</tr>
+{{range .Configs}}{{template "ci_config_row" .}}{{end}}
+{{end}}
+
+{{define "ci_config_row"}}
+<tr id="ciconfig-{{.ID}}" class="ci-config-module-row is-visible">
+    <td></td>
+    <td>{{.ProjectName}}</td>
+    <td>
+        <div class="ci-config-module-name">{{.ModuleName}}</div>
+        <div class="ci-config-module-path">{{.ApplicationName}} / {{.ModulePath}}</div>
+    </td>
+    <td>{{.ReleaseBranch}}</td>
+    <td>{{.ReleaseScriptName}}</td>
+    <td>
+        {{with deref .LastRunStatus}}
+            {{if eq . "success"}}
+                <span class="badge badge-success">成功</span>
+            {{else if eq . "failed"}}
+                <span class="badge badge-failed">失败</span>
+            {{else if eq . "running"}}
+                <span class="badge badge-running">执行中</span>
+            {{end}}
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">未执行</span>
+        {{end}}
+    </td>
+    <td>
+        {{with deref .LastRunStatus}}
+            {{if eq . "success"}}
+                <span style="color:#2b8a3e;font-size:0.8rem">{{formatTime $.LastRunAt}}</span>
+            {{else if eq . "failed"}}
+                <span style="color:#cc0000;font-size:0.8rem" title="{{deref $.LastRunMessage}}">{{formatTime $.LastRunAt}}</span>
+            {{else if eq . "running"}}
+                <span style="color:#e67700;font-size:0.8rem">执行中...</span>
+            {{end}}
+        {{end}}
+    </td>
+    <td>
+        <div class="actions">
+            <button class="primary" onclick="runDeploy({{.ID}})">测试</button>
+            <a href="/applications/{{.ApplicationID}}/logs" class="btn">日志</a>
+            <button onclick="openEditModal('/ci-configs/{{.ID}}/edit')">编辑</button>
+            {{with .ArtifactBuildID}}
+            <button class="primary" onclick="runArtifactBuild({{.}}, {{$.ID}})">打包</button>
+            {{else}}
+            <button disabled title="请先创建打包配置">打包</button>
+            {{end}}
+        </div>
+    </td>
+</tr>
+{{end}}

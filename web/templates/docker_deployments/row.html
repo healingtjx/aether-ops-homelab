@@ -1,0 +1,200 @@
+{{define "docker_deployment_row"}}
+<tr id="docker-deployment-{{.ID}}">
+    <td>
+        <div class="ci-config-module-name">{{.ComposeServiceName}}</div>
+        <div class="ci-config-module-path">{{.ComposeFile}}</div>
+    </td>
+    <td>
+        <div class="ci-config-module-name">{{.ProjectName}} / {{.ApplicationName}}</div>
+        <div class="ci-config-module-path">{{.ModuleName}} / {{.ModulePath}}</div>
+    </td>
+    <td>
+        <div class="ci-config-module-name">{{.Repository}}</div>
+        <div class="ci-config-module-path">{{.RegistryName}} / {{.RegistryURL}}</div>
+    </td>
+    <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{.RemoteDir}}">{{.RemoteDir}}</td>
+    <td>
+        {{if .Enabled}}
+            <span class="badge badge-success">启用</span>
+        {{else}}
+            <span class="badge badge-missing">停用</span>
+        {{end}}
+        {{with deref .LastDeployStatus}}
+            {{if eq . "success"}}<span class="badge badge-success">成功</span>{{end}}
+            {{if eq . "failed"}}<span class="badge badge-failed">失败</span>{{end}}
+            {{if eq . "running"}}<span class="badge badge-running">发布中</span>{{end}}
+        {{end}}
+    </td>
+    <td>
+        {{with .LastDeployedAt}}
+            <span style="font-size:0.8rem" title="{{formatTimeFull .}}">{{formatTime .}}</span>
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">未发布</span>
+        {{end}}
+        {{with deref .LastDeployMessage}}
+            <div class="ci-config-module-path" title="{{.}}">{{truncate 24 .}}</div>
+        {{end}}
+    </td>
+    <td>
+        <div class="actions">
+            <button class="primary" onclick="runArtifactDeploy({{.ID}})" {{if not .Enabled}}disabled{{end}}>发布</button>
+            <button onclick="openArtifactDeployLatestLog({{.ID}})">全量日志</button>
+            <a href="/applications/{{.ApplicationID}}/logs" class="btn">操作日志</a>
+            <button onclick="openEditModal('/docker-deployments/{{.ID}}/edit')">编辑</button>
+            <button class="danger" hx-delete="/docker-deployments/{{.ID}}" hx-confirm="确定要删除发布映射&quot;{{.ComposeServiceName}}&quot;吗？">删除</button>
+        </div>
+    </td>
+</tr>
+{{end}}
+
+{{define "docker_deployment_fields"}}
+{{$mapping := .Mapping}}
+<div class="field">
+    <label>CI 配置</label>
+    <select name="ci_config_id" required>
+        <option value="">请选择...</option>
+        {{range .CIConfigs}}
+        {{$configID := .ID}}
+        <option value="{{.ID}}" {{with $mapping}}{{if eq .CIConfigID $configID}}selected{{end}}{{end}}>
+            {{.ProjectName}} / {{.ApplicationName}} / {{.ModuleName}}
+        </option>
+        {{end}}
+    </select>
+</div>
+<div class="field-row">
+    <div class="field">
+        <label>镜像仓库</label>
+        <select name="registry_id" required onchange="filterDockerDeploymentRepositories(this.form)">
+            <option value="">请选择...</option>
+            {{range .Registries}}
+            {{$registryID := .ID}}
+            <option value="{{.ID}}" {{with $mapping}}{{if eq .RegistryID $registryID}}selected{{end}}{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </div>
+    <div class="field">
+        <label>镜像 repository</label>
+        {{$selectedRegistryID := int64zero}}{{with $mapping}}{{$selectedRegistryID = .RegistryID}}{{end}}
+        {{$selectedRepository := ""}}{{with $mapping}}{{$selectedRepository = .Repository}}{{end}}
+        <select name="repository" required data-role="docker-repository">
+            <option value="">请选择...</option>
+            {{range .Repositories}}
+            <option value="{{.Repository}}" data-registry-id="{{.RegistryID}}" {{if and (eq .RegistryID $selectedRegistryID) (eq .Repository $selectedRepository)}}selected{{end}}>
+                {{.RegistryName}} / {{.Repository}}（{{.TagCount}}）
+            </option>
+            {{end}}
+        </select>
+        {{if not .Repositories}}<span class="error">暂无可选 repository，请先同步镜像仓库</span>{{end}}
+    </div>
+</div>
+<div class="field-row">
+    <div class="field">
+        <label>Compose service 名</label>
+        <input type="text" name="compose_service_name" value="{{with $mapping}}{{.ComposeServiceName}}{{end}}" placeholder="如 bmser-auth" required maxlength="255">
+    </div>
+    <div class="field">
+        <label>Compose 文件</label>
+        <input type="text" name="compose_file" value="{{with $mapping}}{{.ComposeFile}}{{else}}docker-compose.yml{{end}}" required>
+    </div>
+</div>
+<div class="field">
+    <label>远端目录</label>
+    <input type="text" name="remote_dir" value="{{with $mapping}}{{.RemoteDir}}{{end}}" placeholder="/opt/bmser" required>
+</div>
+<div class="field">
+    <label>描述</label>
+    <input type="text" name="description" value="{{with $mapping}}{{deref .Description}}{{end}}" placeholder="可选">
+</div>
+<div class="field">
+    <label style="display:flex;align-items:center;gap:0.4rem;font-weight:500">
+        <input type="checkbox" name="enabled" style="width:auto" {{with $mapping}}{{if .Enabled}}checked{{end}}{{else}}checked{{end}}>
+        启用
+    </label>
+</div>
+{{end}}
+
+{{define "docker_deployment_edit_form"}}
+<div class="modal-header"><h2>编辑发布映射</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/docker-deployments/{{.Mapping.ID}}" hx-target="#modal-container" hx-swap="innerHTML"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          window.location.reload();
+        }">
+    {{template "docker_deployment_fields" .}}
+    {{with .Error}}<span class="error">{{.}}</span>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}
+
+{{define "docker_deployment_log_modal"}}
+<div class="modal-header"><h2>产物发布全量日志</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<div style="margin-bottom:0.75rem;font-size:0.85rem;color:#495057">
+    <div><strong>{{.Mapping.ProjectName}} / {{.Mapping.ApplicationName}}</strong></div>
+    <div style="margin-top:0.2rem;color:#868e96">{{.Mapping.ComposeServiceName}} · {{.Mapping.RemoteDir}}</div>
+    {{with .Run}}
+    <div style="margin-top:0.2rem;color:#868e96">镜像：{{.ArtifactImage}}</div>
+    <div style="margin-top:0.2rem;color:#868e96">开始：{{formatTimeFull .StartedAt}} · 完成：{{formatTimeFull .FinishedAt}}</div>
+    {{end}}
+</div>
+{{with .Error}}
+<div class="error">{{.}}</div>
+{{else}}
+<div class="log-modal">
+    {{range .Logs}}<div>{{.Content}}</div>{{else}}<div>暂无日志内容</div>{{end}}
+</div>
+{{with .Run}}
+<div class="log-status log-status-{{.Status}}">
+    {{if eq .Status "success"}}发布成功{{else if eq .Status "failed"}}发布失败{{else if eq .Status "running"}}发布中{{else}}{{.Status}}{{end}}
+</div>
+{{end}}
+{{end}}
+<div class="modal-actions">
+    <button onclick="closeModal()">关闭</button>
+</div>
+{{end}}
+
+{{define "docker_deployment_run_confirm"}}
+<div class="modal-header"><h2>确认产物发布</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form onsubmit="submitArtifactDeployRun(event, this, {{.Mapping.ID}})">
+    <div class="field">
+        <label>CI 配置</label>
+        <input type="text" value="{{.Mapping.ProjectName}} / {{.Mapping.ApplicationName}} / {{.Mapping.ModuleName}}" disabled>
+    </div>
+    <div class="field-row">
+        <div class="field">
+            <label>Compose service</label>
+            <input type="text" value="{{.Mapping.ComposeServiceName}}" disabled>
+        </div>
+        <div class="field">
+            <label>Compose 文件</label>
+            <input type="text" value="{{.Mapping.ComposeFile}}" disabled>
+        </div>
+    </div>
+    <div class="field">
+        <label>远端目录</label>
+        <input type="text" value="{{.Mapping.RemoteDir}}" disabled>
+    </div>
+    <div class="field">
+        <label>Registry 地址</label>
+        <input type="text" value="{{.Mapping.RegistryHost}}" disabled>
+    </div>
+    <div class="field">
+        <label>发布产物</label>
+        <select name="artifact_id" required>
+            <option value="">请选择 tag...</option>
+            {{range .Artifacts}}
+            <option value="{{.ID}}">{{.RepositoryTagRef}}</option>
+            {{end}}
+        </select>
+        {{if not .Artifacts}}<span class="error">该 repository 暂无可发布产物，请先同步镜像仓库</span>{{end}}
+    </div>
+    <div id="artifact-deploy-run-error"></div>
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary" {{if not .Artifacts}}disabled{{end}}>开始发布</button>
+    </div>
+</form>
+{{end}}

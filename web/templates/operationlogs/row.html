@@ -1,0 +1,33 @@
+{{define "operation_log_row"}}
+<tr>
+    <td>{{.ProjectName}}</td>
+    <td>{{.ApplicationName}}</td>
+    <td style="min-width:220px">
+        {{if .ModuleName}}<div><strong>模块：</strong>{{.ModuleName}}</div>{{end}}
+        {{if .ModulePath}}<div style="color:#868e96;font-size:0.78rem"><strong>路径：</strong>{{.ModulePath}}</div>{{end}}
+        {{if .ReleaseBranch}}<div style="color:#495057;font-size:0.78rem"><strong>分支：</strong>{{.ReleaseBranch}}</div>{{end}}
+        {{if .ReleaseScriptName}}<div style="color:#495057;font-size:0.78rem"><strong>脚本：</strong>{{.ReleaseScriptName}}</div>{{end}}
+        {{if .ArtifactImage}}<div style="color:#495057;font-size:0.78rem"><strong>镜像：</strong>{{.ArtifactImage}}</div>{{end}}
+        {{if .ComposeServiceName}}<div style="color:#495057;font-size:0.78rem"><strong>Service：</strong>{{.ComposeServiceName}}</div>{{end}}
+        {{if .DeployRemoteDir}}<div style="color:#868e96;font-size:0.78rem"><strong>远端：</strong>{{.DeployRemoteDir}}</div>{{end}}
+        {{if .CIConfigID}}{{else}}{{if .ModuleName}}{{else}}{{if .ModulePath}}{{else}}{{if .ReleaseBranch}}{{else}}{{if .ReleaseScriptName}}{{else}}{{if .ArtifactImage}}{{else}}-{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}
+    </td>
+    <td>
+        {{if eq .OperationType "pull"}}<span class="badge badge-pull">拉取</span>
+        {{else if eq .OperationType "deploy"}}<span class="badge badge-deploy">部署</span>
+        {{else if eq .OperationType "artifact_build"}}<span class="badge badge-deploy">打包</span>
+        {{else if eq .OperationType "artifact_deploy"}}<span class="badge badge-deploy">产物发布</span>
+        {{else}}<span class="badge">{{.OperationType}}</span>{{end}}
+    </td>
+    <td>
+        {{if eq .Status "success"}}<span class="badge badge-success">成功</span>
+        {{else if eq .Status "failed"}}<span class="badge badge-failed">失败</span>
+        {{else if eq .Status "running"}}<span class="badge badge-running">运行中</span>
+        {{else}}<span class="badge">{{.Status}}</span>{{end}}
+    </td>
+    <td>{{or "-" .Username}}</td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{or "" .Message}}">{{or "-" .Message}}</td>
+    <td style="white-space:nowrap">{{formatTimeFull .StartedAt}}</td>
+    <td style="white-space:nowrap">{{formatTimeFull .FinishedAt}}</td>
+</tr>
+{{end}}

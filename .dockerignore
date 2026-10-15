@@ -1,0 +1,10 @@
+.git
+.idea
+_run
+docker-deploy
+aether_ops
+config.yaml
+*.log
+tmp
+dist
+build

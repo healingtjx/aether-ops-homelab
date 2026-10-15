@@ -1,0 +1,79 @@
+{{define "artifacts_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<div class="page-toolbar">
+    <h1>产物管理</h1>
+    <div class="toolbar-actions">
+        <select id="artifact-sync-registry" onchange="updateArtifactSyncButton()" aria-label="选择同步仓库">
+            <option value="">选择同步仓库...</option>
+            {{range .Registries}}{{if .Enabled}}
+            <option value="{{.ID}}">{{.Name}}</option>
+            {{end}}{{end}}
+        </select>
+        <button id="artifact-sync-button" class="primary" type="button" onclick="syncArtifactRegistry()" disabled>
+            <span class="button-spinner" aria-hidden="true"></span>
+            <span class="button-label">同步仓库</span>
+        </button>
+        <button class="primary" onclick="openCreateModal('artifact-registry-create-form')">创建镜像仓库</button>
+    </div>
+</div>
+
+<div id="artifact-sync-message" class="sync-message" aria-live="polite"></div>
+
+<form method="GET" action="/artifacts" style="display:flex;gap:0.5rem;align-items:flex-end;margin-top:1rem;max-width:620px">
+    <div style="flex:1">
+        <label style="font-size:0.8rem;font-weight:600;color:#495057">仓库</label>
+        <select name="registry_id">
+            <option value="">全部</option>
+            {{range .Registries}}
+            <option value="{{.ID}}" {{if eq $.SelectedRegistryID .ID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </div>
+    <div style="width:180px">
+        <label style="font-size:0.8rem;font-weight:600;color:#495057">状态</label>
+        <select name="status">
+            <option value="" {{if eq .SelectedStatus ""}}selected{{end}}>全部</option>
+            <option value="present" {{if eq .SelectedStatus "present"}}selected{{end}}>存在</option>
+            <option value="deleted" {{if eq .SelectedStatus "deleted"}}selected{{end}}>已删除</option>
+        </select>
+    </div>
+    <button type="submit">筛选</button>
+</form>
+
+<table>
+    <thead><tr><th style="width:42px"></th><th>镜像 / 仓库</th><th>Tag</th><th>Digest</th><th>大小</th><th>状态</th><th>同步 / 推送时间</th><th style="width:140px">操作</th></tr></thead>
+    <tbody id="artifacts-table">
+        {{range .Groups}}{{template "artifact_repository_group" .}}{{else}}
+        <tr><td colspan="8" style="color:#868e96">暂无产物数据，请先同步镜像仓库</td></tr>
+        {{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="artifact-registry-create-form">
+    <div class="modal-header"><h2>创建镜像仓库</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/artifact-registries" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              window.location.reload();
+            }">
+        {{template "artifact_registry_fields" dict}}
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

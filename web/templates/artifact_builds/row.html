@@ -1,0 +1,166 @@
+{{define "artifact_build_group"}}
+<tr class="ci-config-group-row expanded">
+    <td>
+        <button type="button" class="ci-config-toggle" aria-expanded="true" onclick="toggleCIConfigGroup(this)">
+            <span class="chevron">›</span>
+        </button>
+    </td>
+    <td>{{.ProjectName}}</td>
+    <td>
+        <div>{{.ApplicationName}} <span class="badge">{{len .Configs}} 个配置</span></div>
+        <div class="ci-config-module-path" title="{{.GitURL}}">{{.GitURL}}</div>
+    </td>
+    <td style="color:#868e96;font-size:0.8rem">按配置显示</td>
+    <td style="color:#868e96;font-size:0.8rem">按配置显示</td>
+    <td colspan="4" style="color:#868e96;font-size:0.8rem">点击展开配置</td>
+</tr>
+{{range .Configs}}{{template "artifact_build_row" .}}{{end}}
+{{end}}
+
+{{define "artifact_build_row"}}
+<tr id="artifactbuild-{{.ID}}" class="ci-config-module-row is-visible">
+    <td></td>
+    <td>{{.ProjectName}}</td>
+    <td>
+        <div class="ci-config-module-name">{{.ModuleName}}</div>
+        <div class="ci-config-module-path">{{.ApplicationName}} / {{.ModulePath}}</div>
+    </td>
+    <td>{{.ReleaseBranch}}</td>
+    <td>{{if .ArtifactReleaseScriptName}}{{.ArtifactReleaseScriptName}}{{else}}{{.ReleaseScriptName}}{{end}}</td>
+    <td>{{if eq .BuildMode "script"}}通用脚本{{else}}{{if .ArtifactRegistryName}}{{.ArtifactRegistryName}}{{else}}未配置{{end}}{{end}}</td>
+    <td>
+        {{with deref .LastRunStatus}}
+            {{if eq . "success"}}
+                <span class="badge badge-success">成功</span>
+            {{else if eq . "failed"}}
+                <span class="badge badge-failed">失败</span>
+            {{else if eq . "running"}}
+                <span class="badge badge-running">执行中</span>
+            {{end}}
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">未执行</span>
+        {{end}}
+    </td>
+    <td>
+        {{with deref .LastRunStatus}}
+            {{if eq . "success"}}
+                <span style="color:#2b8a3e;font-size:0.8rem">{{formatTime $.LastRunAt}}</span>
+            {{else if eq . "failed"}}
+                <span style="color:#cc0000;font-size:0.8rem" title="{{deref $.LastRunMessage}}">{{formatTime $.LastRunAt}}</span>
+            {{else if eq . "running"}}
+                <span style="color:#e67700;font-size:0.8rem">执行中...</span>
+            {{end}}
+        {{end}}
+    </td>
+    <td>
+        <div class="actions">
+            <button class="primary" onclick="runArtifactBuild({{.ID}})">打包</button>
+            <a href="/applications/{{.ApplicationID}}/logs" class="btn">日志</a>
+            <button onclick="openEditModal('/artifact-builds/{{.ID}}/edit')">编辑</button>
+        </div>
+    </td>
+</tr>
+{{end}}
+
+{{define "artifact_build_edit_form"}}
+<div class="modal-header"><h2>编辑打包配置</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/artifact-builds/{{.Config.ID}}" hx-swap="none"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          window.location.reload();
+        }">
+    <div class="field">
+        <label>应用</label>
+        <input type="text" value="{{.Config.ProjectName}} / {{.Config.ApplicationName}}" disabled>
+    </div>
+    <div class="field">
+        <label>发布脚本</label>
+        <select name="artifact_release_script_id" required>
+            <option value="">请选择...</option>
+            {{$selectedScriptID := .Config.ReleaseScriptID}}
+            {{with .Config.ArtifactReleaseScriptID}}{{$selectedScriptID = derefInt64 .}}{{end}}
+            {{range .Scripts}}
+            <option value="{{.ID}}" {{if eq .ID $selectedScriptID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </div>
+    <div class="field">
+        <label>打包方式</label>
+        <select name="build_mode" required onchange="toggleArtifactBuildRegistry(this)">
+            <option value="docker" {{if eq .Config.BuildMode "docker"}}selected{{end}}>Docker 镜像</option>
+            <option value="script" {{if eq .Config.BuildMode "script"}}selected{{end}}>通用脚本</option>
+        </select>
+    </div>
+    <div class="field" data-role="artifact-registry-field" {{if eq .Config.BuildMode "script"}}style="display:none"{{end}}>
+        <label>镜像仓库</label>
+        <select name="artifact_registry_id" data-role="artifact-registry" {{if eq .Config.BuildMode "docker"}}required{{end}}>
+            <option value="">请选择...</option>
+            {{$registryID := int64zero}}
+            {{with .Config.ArtifactRegistryID}}{{$registryID = derefInt64 .}}{{end}}
+            {{range .Registries}}{{if .Enabled}}
+            <option value="{{.ID}}" {{if eq .ID $registryID}}selected{{end}}>{{.Name}}</option>
+            {{end}}{{end}}
+        </select>
+    </div>
+    {{if .Error}}<span class="error">{{.Error}}</span>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}
+
+{{define "artifact_build_run_confirm"}}
+<div class="modal-header"><h2>确认打包</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form onsubmit="startArtifactBuildRun(event, this, {{.Config.ID}})">
+    <div class="field">
+        <label>应用</label>
+        <input type="text" value="{{.App.ProjectName}} / {{.App.Name}}" disabled>
+    </div>
+    <div class="field">
+        <label>发布分支</label>
+        <input type="text" value="{{.App.DefaultBranch}}" disabled>
+    </div>
+    <div class="field">
+        <label>发布脚本</label>
+        <input type="text" value="{{.Script.Name}}" disabled>
+    </div>
+    {{if eq .Config.BuildMode "script"}}
+    <details class="deploy-run-vars">
+        <summary>本次变量</summary>
+        <div class="deploy-run-vars-body">
+            <div id="artifact-build-run-vars-{{.Config.ID}}" class="variable-list">
+                {{range .Variables}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" value="{{.Key}}" placeholder="变量名">
+                    <input type="text" name="variable_value" value="{{.Value}}" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+                {{else}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" placeholder="变量名">
+                    <input type="text" name="variable_value" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+                {{end}}
+            </div>
+            <button type="button" onclick="addVariableRow('artifact-build-run-vars-{{.Config.ID}}')">添加变量</button>
+        </div>
+    </details>
+    {{else}}
+    <div class="field">
+        <label>镜像仓库</label>
+        <input type="text" value="{{.Config.ArtifactRegistryName}}" disabled>
+    </div>
+    <div class="field">
+        <label>版本号</label>
+        <input type="text" name="image_tag" value="{{.DefaultImageTag}}" placeholder="如 26.0611.0" required>
+    </div>
+    {{end}}
+    <div id="artifact-build-run-error"></div>
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">开始打包</button>
+    </div>
+</form>
+{{end}}

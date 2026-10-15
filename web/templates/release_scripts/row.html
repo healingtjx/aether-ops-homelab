@@ -1,0 +1,13 @@
+{{define "release_script_row"}}
+<tr id="script-{{.ID}}">
+    <td>{{.Name}}</td>
+    <td>{{or "-" .Description}}</td>
+    <td>
+        <div class="actions">
+            <button onclick="openEditModal('/release-scripts/{{.ID}}/edit')">编辑</button>
+            <button class="danger" hx-delete="/release-scripts/{{.ID}}" hx-target="closest tr" hx-swap="outerHTML"
+                    hx-confirm="确定要删除脚本&quot;{{.Name}}&quot;吗？正在使用的脚本无法删除。">删除</button>
+        </div>
+    </td>
+</tr>
+{{end}}

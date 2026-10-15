@@ -1,0 +1,37 @@
+{{define "global_config_tools_form"}}
+<form id="global-tools-form" hx-put="/global-config/tools" hx-target="#global-tools-form" hx-swap="outerHTML">
+    <div class="field">
+        <label>Git 路径</label>
+        <input type="text" name="git_path" value="{{.Config.GitPath}}" placeholder="git 或 /usr/bin/git" required>
+    </div>
+    <div class="field">
+        <label>Maven Home Path</label>
+        <input type="text" name="maven_home_path" value="{{.Config.MavenHomePath}}" placeholder="/Users/tjx/tools/maven3.8">
+    </div>
+    <div class="field">
+        <label>User Settings File</label>
+        <input type="text" name="maven_user_settings_file" value="{{.Config.MavenUserSettingsFile}}" placeholder="/Users/tjx/.m2/settings.xml">
+    </div>
+    <div class="field">
+        <label>Local Repository</label>
+        <input type="text" name="maven_local_repository" value="{{.Config.MavenLocalRepository}}" placeholder="/Users/tjx/.m2/repository">
+    </div>
+    <div class="field">
+        <label>NPM Home Path</label>
+        <input type="text" name="npm_home_path" value="{{.Config.NPMHomePath}}" placeholder="/Users/tjx/tools/node">
+    </div>
+    <div class="field">
+        <label>NPM User Config File</label>
+        <input type="text" name="npm_user_config_file" value="{{.Config.NPMUserConfigFile}}" placeholder="/Users/tjx/.npmrc">
+    </div>
+    <div class="field">
+        <label>NPM Cache Directory</label>
+        <input type="text" name="npm_cache_directory" value="{{.Config.NPMCacheDirectory}}" placeholder="/Users/tjx/.npm">
+    </div>
+    {{if .Error}}<span class="error">{{.Error}}</span>{{end}}
+    {{if .Success}}<span class="success">{{.Success}}</span>{{end}}
+    <div class="form-actions">
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}

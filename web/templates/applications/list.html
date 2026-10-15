@@ -1,0 +1,64 @@
+{{define "applications_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>应用</h1>
+<button class="primary" onclick="openCreateModal('app-create-form')">创建应用</button>
+
+<table>
+    <thead><tr><th>项目</th><th>名称</th><th>Git 地址</th><th>发布分支</th><th>拉取状态</th><th style="width:160px">操作</th></tr></thead>
+    <tbody id="apps-table">
+        {{range .Applications}}{{template "application_row" .}}{{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="app-create-form">
+    <div class="modal-header"><h2>创建应用</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/applications" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              document.getElementById('apps-table').insertAdjacentHTML('afterbegin', event.detail.xhr.responseText);
+              closeModal();
+              this.reset();
+            }">
+        <div class="field">
+            <label>项目</label>
+            <select name="project_id" required>
+                <option value="">请选择...</option>
+                {{range .Projects}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            </select>
+        </div>
+        <div class="field">
+            <label>名称</label>
+            <input type="text" name="name" placeholder="应用名称" required maxlength="255">
+        </div>
+        <div class="field">
+            <label>Git 地址</label>
+            <input type="text" name="git_url" placeholder="https://github.com/..." required>
+        </div>
+        <div class="field">
+            <label>发布分支</label>
+            <input type="text" name="default_branch" value="main" required>
+        </div>
+        <div class="field">
+            <label>描述</label>
+            <input type="text" name="description" placeholder="描述（可选）">
+        </div>
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

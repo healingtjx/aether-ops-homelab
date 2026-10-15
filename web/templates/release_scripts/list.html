@@ -1,0 +1,64 @@
+{{define "release_scripts_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>发布脚本</h1>
+<button class="primary" onclick="openCreateModal('script-create-form')">创建脚本</button>
+
+<table>
+    <thead><tr><th>名称</th><th>描述</th><th style="width:130px">操作</th></tr></thead>
+    <tbody id="scripts-table">
+        {{range .Scripts}}{{template "release_script_row" .}}{{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="script-create-form">
+    <div class="modal-header"><h2>创建脚本</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/release-scripts" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              document.getElementById('scripts-table').insertAdjacentHTML('afterbegin', event.detail.xhr.responseText);
+              closeModal();
+              this.reset();
+            }">
+        <div class="field">
+            <label>名称</label>
+            <input type="text" name="name" placeholder="脚本名称" required maxlength="255">
+        </div>
+        <div class="field">
+            <label>描述</label>
+            <input type="text" name="description" placeholder="描述（可选）">
+        </div>
+        <div class="field">
+            <label>脚本内容</label>
+            <textarea name="content" rows="12" style="font-family:'Menlo','Consolas',monospace;font-size:0.8rem" placeholder="#!/bin/bash&#10;echo 'Hello World'" required></textarea>
+        </div>
+        <div class="field">
+            <label>默认变量</label>
+            <div id="script-create-vars" class="variable-list">
+                <div class="variable-row">
+                    <input type="text" name="variable_key" placeholder="变量名，如 REMOTE_HOST">
+                    <input type="text" name="variable_value" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            </div>
+            <button type="button" onclick="addVariableRow('script-create-vars')">添加变量</button>
+        </div>
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

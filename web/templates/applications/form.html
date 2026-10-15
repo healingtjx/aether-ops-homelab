@@ -1,0 +1,40 @@
+{{define "application_edit_form"}}
+<div class="modal-header"><h2>编辑应用</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/applications/{{.Application.ID}}" hx-swap="none"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          var row = document.getElementById('app-{{.Application.ID}}');
+          if(row) row.outerHTML = event.detail.xhr.responseText;
+          closeModal();
+        } else if(event.detail.xhr) {
+          document.getElementById('modal-container').innerHTML = event.detail.xhr.responseText;
+        }">
+    <div class="field">
+        <label>项目</label>
+        <select name="project_id" required>
+            {{range .Projects}}<option value="{{.ID}}" {{if eq .ID $.Application.ProjectID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+    </div>
+    <div class="field">
+        <label>名称</label>
+        <input type="text" name="name" value="{{.Application.Name}}" required maxlength="255">
+    </div>
+    <div class="field">
+        <label>Git 地址</label>
+        <input type="text" name="git_url" value="{{.Application.GitURL}}" required>
+    </div>
+    <div class="field">
+        <label>发布分支</label>
+        <input type="text" name="default_branch" value="{{.Application.DefaultBranch}}" required>
+    </div>
+    <div class="field">
+        <label>描述</label>
+        <input type="text" name="description" value="{{or "" .Application.Description}}">
+    </div>
+    {{if .Error}}<div id="modal-error"><span class="error">{{.Error}}</span></div>{{else}}<div id="modal-error"></div>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}

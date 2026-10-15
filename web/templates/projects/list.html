@@ -1,0 +1,49 @@
+{{define "projects_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>项目</h1>
+<button class="primary" onclick="openCreateModal('project-create-form')">创建项目</button>
+
+<table>
+    <thead><tr><th>名称</th><th>描述</th><th style="width:130px">操作</th></tr></thead>
+    <tbody id="projects-table">
+        {{range .Projects}}{{template "project_row" .}}{{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="project-create-form">
+    <div class="modal-header"><h2>创建项目</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/projects" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              document.getElementById('projects-table').insertAdjacentHTML('afterbegin', event.detail.xhr.responseText);
+              closeModal();
+              this.reset();
+            }">
+        <div class="field">
+            <label>名称</label>
+            <input type="text" name="name" placeholder="项目名称" required maxlength="255">
+        </div>
+        <div class="field">
+            <label>描述</label>
+            <input type="text" name="description" placeholder="描述（可选）">
+        </div>
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

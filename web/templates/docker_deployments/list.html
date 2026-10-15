@@ -1,0 +1,46 @@
+{{define "docker_deployments_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<div class="page-toolbar">
+    <h1>产物发布</h1>
+    <div class="toolbar-actions">
+        <button class="primary" onclick="openCreateModal('docker-deployment-create-form')">创建发布映射</button>
+    </div>
+</div>
+
+<table>
+    <thead><tr><th>Compose</th><th>CI 配置</th><th>镜像仓库</th><th>远端目录</th><th>状态</th><th>上次发布</th><th style="width:190px">操作</th></tr></thead>
+    <tbody id="docker-deployments-table">
+        {{range .Mappings}}{{template "docker_deployment_row" .}}{{else}}
+        <tr><td colspan="7" style="color:#868e96;text-align:center">暂无发布映射</td></tr>
+        {{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="docker-deployment-create-form">
+    <div class="modal-header"><h2>创建发布映射</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/docker-deployments" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              window.location.reload();
+            }">
+        {{template "docker_deployment_fields" dict "CIConfigs" .CIConfigs "Registries" .Registries "Repositories" .Repositories}}
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

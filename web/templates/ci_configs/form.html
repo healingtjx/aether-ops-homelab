@@ -1,0 +1,147 @@
+{{define "ci_config_edit_form"}}
+<div class="modal-header"><h2>编辑 CI 配置</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/ci-configs/{{.Config.ID}}" hx-swap="none"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          window.location.reload();
+        } else if(event.detail.xhr) {
+          document.getElementById('modal-container').innerHTML = event.detail.xhr.responseText;
+        }">
+    <div class="field">
+        <label>应用</label>
+        <input type="text" value="{{.Config.ProjectName}} / {{.Config.ApplicationName}}" disabled>
+    </div>
+    <div class="field">
+        <label>发布脚本</label>
+        <select name="release_script_id" required>
+            {{range .Scripts}}<option value="{{.ID}}" {{if eq .ID $.Config.ReleaseScriptID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+    </div>
+    <div class="field">
+        <label>打包脚本</label>
+        {{with .ArtifactConfig}}
+        <select name="artifact_release_script_id" required>
+            {{$selectedScriptID := .ReleaseScriptID}}
+            {{with .ArtifactReleaseScriptID}}{{$selectedScriptID = derefInt64 .}}{{end}}
+            {{range $.Scripts}}<option value="{{.ID}}" {{if eq .ID $selectedScriptID}}selected{{end}}>{{.Name}}</option>{{end}}
+        </select>
+        {{else}}
+        <input type="text" value="未创建打包配置" disabled>
+        {{end}}
+    </div>
+    {{with .ArtifactConfig}}
+    <div class="field">
+        <label>打包方式</label>
+        <select name="build_mode" required onchange="toggleArtifactBuildRegistry(this)">
+            <option value="docker" {{if eq .BuildMode "docker"}}selected{{end}}>Docker 镜像</option>
+            <option value="script" {{if eq .BuildMode "script"}}selected{{end}}>通用脚本</option>
+        </select>
+    </div>
+    <div class="field" data-role="artifact-registry-field" {{if eq .BuildMode "script"}}style="display:none"{{end}}>
+        <label>镜像仓库</label>
+        <select name="artifact_registry_id" data-role="artifact-registry" {{if eq .BuildMode "docker"}}required{{end}}>
+            <option value="">请选择...</option>
+            {{$registryID := int64zero}}
+            {{with .ArtifactRegistryID}}{{$registryID = derefInt64 .}}{{end}}
+            {{range $.Registries}}{{if .Enabled}}
+            <option value="{{.ID}}" {{if eq .ID $registryID}}selected{{end}}>{{.Name}}</option>
+            {{end}}{{end}}
+        </select>
+    </div>
+    {{end}}
+    <div class="field">
+        <label>测试分支</label>
+        <input type="text" name="release_branch" value="{{.Config.ReleaseBranch}}" required>
+    </div>
+    <div class="field-row">
+        <div class="field">
+            <label>模块名称</label>
+            <input type="text" name="module_name" value="{{.Config.ModuleName}}" required maxlength="255">
+        </div>
+        <div class="field">
+            <label>模块路径</label>
+            <input type="text" name="module_path" value="{{.Config.ModulePath}}" placeholder="为空时使用模块名称">
+        </div>
+    </div>
+    <div class="field">
+        <label>变量覆盖</label>
+        <div id="ciconfig-edit-vars-{{.Config.ID}}" class="variable-list">
+            {{range .Config.Variables.Entries}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" value="{{.Key}}" placeholder="变量名，如 PROJECT_NAME">
+                    <input type="text" name="variable_value" value="{{.Value}}" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            {{else}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" placeholder="变量名，如 PROJECT_NAME">
+                    <input type="text" name="variable_value" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            {{end}}
+        </div>
+        <button type="button" onclick="addVariableRow('ciconfig-edit-vars-{{.Config.ID}}')">添加变量</button>
+    </div>
+    {{if .Error}}<div id="modal-error"><span class="error">{{.Error}}</span></div>{{else}}<div id="modal-error"></div>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}
+
+{{define "ci_config_run_confirm"}}
+<div class="modal-header"><h2>确认测试</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form onsubmit="submitDeployRun(event, this, {{.Config.ID}})">
+    <div class="field">
+        <label>应用</label>
+        <input type="text" value="{{.Config.ProjectName}} / {{.Config.ApplicationName}}" disabled>
+    </div>
+    <div class="field-row">
+        <div class="field">
+            <label>模块</label>
+            <input type="text" value="{{.Config.ModuleName}}" disabled>
+        </div>
+        <div class="field">
+            <label>模块路径</label>
+            <input type="text" value="{{.Config.ModulePath}}" disabled>
+        </div>
+    </div>
+    <div class="field-row">
+        <div class="field">
+            <label>测试分支</label>
+            <input type="text" value="{{.Config.ReleaseBranch}}" disabled>
+        </div>
+        <div class="field">
+            <label>发布脚本</label>
+            <input type="text" value="{{.Script.Name}}" disabled>
+        </div>
+    </div>
+    <details class="deploy-run-vars">
+        <summary>本次变量</summary>
+        <div class="deploy-run-vars-body">
+            <div id="deploy-run-vars-{{.Config.ID}}" class="variable-list">
+                {{range .Variables}}
+                    <div class="variable-row">
+                        <input type="text" name="variable_key" value="{{.Key}}" placeholder="变量名">
+                        <input type="text" name="variable_value" value="{{.Value}}" placeholder="变量值">
+                        <button type="button" onclick="removeVariableRow(this)">删除</button>
+                    </div>
+                {{else}}
+                    <div class="variable-row">
+                        <input type="text" name="variable_key" placeholder="变量名">
+                        <input type="text" name="variable_value" placeholder="变量值">
+                        <button type="button" onclick="removeVariableRow(this)">删除</button>
+                    </div>
+                {{end}}
+            </div>
+            <button type="button" onclick="addVariableRow('deploy-run-vars-{{.Config.ID}}')">添加变量</button>
+        </div>
+    </details>
+    <div id="deploy-run-error"></div>
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">开始测试</button>
+    </div>
+</form>
+{{end}}

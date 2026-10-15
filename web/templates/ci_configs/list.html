@@ -1,0 +1,122 @@
+{{define "ci_configs_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>CI 配置</h1>
+<button class="primary" onclick="openCreateModal('ciconfig-create-form')">创建 CI 配置</button>
+<button onclick="openCreateModal('artifact-build-create-form')">创建打包配置</button>
+
+<table>
+    <thead><tr><th style="width:42px"></th><th>项目</th><th>应用 / 模块</th><th>测试分支</th><th>发布脚本</th><th>上次状态</th><th>上次执行</th><th style="width:220px">操作</th></tr></thead>
+    <tbody id="ciconfigs-table">
+        {{range .Groups}}{{template "ci_config_group" .}}{{end}}
+    </tbody>
+</table>
+</main>
+</div>
+
+{{template "modal"}}
+
+<template id="ciconfig-create-form">
+    <div class="modal-header"><h2>创建 CI 配置</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/ci-configs" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              window.location.reload();
+            }">
+        <div class="field">
+            <label>应用</label>
+            <select name="application_id" required onchange="this.form.release_branch.value = this.selectedOptions[0].dataset.branch || 'main'">
+                <option value="">请选择...</option>
+                {{range .Applications}}<option value="{{.ID}}" data-branch="{{.DefaultBranch}}">{{.ProjectName}} / {{.Name}}</option>{{end}}
+            </select>
+        </div>
+        <div class="field">
+            <label>发布脚本</label>
+            <select name="release_script_id" required>
+                <option value="">请选择...</option>
+                {{range .Scripts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            </select>
+        </div>
+        <div class="field">
+            <label>测试分支</label>
+            <input type="text" name="release_branch" value="main" required>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label>模块名称</label>
+                <input type="text" name="module_name" placeholder="如 blade-auth" required maxlength="255">
+            </div>
+            <div class="field">
+                <label>模块路径</label>
+                <input type="text" name="module_path" placeholder="为空时使用模块名称">
+            </div>
+        </div>
+        <div class="field">
+            <label>变量覆盖</label>
+            <div id="ciconfig-create-vars" class="variable-list">
+                <div class="variable-row">
+                    <input type="text" name="variable_key" placeholder="变量名，如 PROJECT_NAME">
+                    <input type="text" name="variable_value" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            </div>
+            <button type="button" onclick="addVariableRow('ciconfig-create-vars')">添加变量</button>
+        </div>
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+
+<template id="artifact-build-create-form">
+    <div class="modal-header"><h2>创建打包配置</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <form hx-post="/artifact-builds" hx-target="#modal-error"
+          hx-on::after-request="
+            if(event.detail.successful) {
+              window.location.reload();
+            }">
+        <div class="field">
+            <label>应用</label>
+            <select name="application_id" required>
+                <option value="">请选择...</option>
+                {{range .Applications}}<option value="{{.ID}}">{{.ProjectName}} / {{.Name}}（{{.DefaultBranch}}）</option>{{end}}
+            </select>
+        </div>
+        <div class="field">
+            <label>打包脚本</label>
+            <select name="release_script_id" required>
+                <option value="">请选择...</option>
+                {{range .Scripts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            </select>
+        </div>
+        <div class="field">
+            <label>打包方式</label>
+            <select name="build_mode" required onchange="toggleArtifactBuildRegistry(this)">
+                <option value="docker">Docker 镜像</option>
+                <option value="script">通用脚本</option>
+            </select>
+        </div>
+        <div class="field" data-role="artifact-registry-field">
+            <label>镜像仓库</label>
+            <select name="artifact_registry_id" data-role="artifact-registry" required>
+                <option value="">请选择...</option>
+                {{range .Registries}}{{if .Enabled}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+            </select>
+        </div>
+        <div id="modal-error"></div>
+        <div class="modal-actions">
+            <button type="button" onclick="closeModal()">取消</button>
+            <button type="submit" class="primary">创建</button>
+        </div>
+    </form>
+</template>
+</body>
+</html>
+{{end}}

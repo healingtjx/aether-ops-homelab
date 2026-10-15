@@ -1,0 +1,49 @@
+{{define "release_script_edit_form"}}
+<div class="modal-header"><h2>编辑脚本</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/release-scripts/{{.Script.ID}}" hx-swap="none"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          var row = document.getElementById('script-{{.Script.ID}}');
+          if(row) row.outerHTML = event.detail.xhr.responseText;
+          closeModal();
+        } else if(event.detail.xhr) {
+          document.getElementById('modal-container').innerHTML = event.detail.xhr.responseText;
+        }">
+    <div class="field">
+        <label>名称</label>
+        <input type="text" name="name" value="{{.Script.Name}}" required maxlength="255">
+    </div>
+    <div class="field">
+        <label>描述</label>
+        <input type="text" name="description" value="{{or "" .Script.Description}}">
+    </div>
+    <div class="field">
+        <label>脚本内容</label>
+        <textarea name="content" rows="12" style="font-family:'Menlo','Consolas',monospace;font-size:0.8rem" required>{{.Script.Content}}</textarea>
+    </div>
+    <div class="field">
+        <label>默认变量</label>
+        <div id="script-edit-vars-{{.Script.ID}}" class="variable-list">
+            {{range .Script.DefaultVariables.Entries}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" value="{{.Key}}" placeholder="变量名，如 REMOTE_HOST">
+                    <input type="text" name="variable_value" value="{{.Value}}" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            {{else}}
+                <div class="variable-row">
+                    <input type="text" name="variable_key" placeholder="变量名，如 REMOTE_HOST">
+                    <input type="text" name="variable_value" placeholder="变量值">
+                    <button type="button" onclick="removeVariableRow(this)">删除</button>
+                </div>
+            {{end}}
+        </div>
+        <button type="button" onclick="addVariableRow('script-edit-vars-{{.Script.ID}}')">添加变量</button>
+    </div>
+    {{if .Error}}<div id="modal-error"><span class="error">{{.Error}}</span></div>{{else}}<div id="modal-error"></div>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}

@@ -1,0 +1,169 @@
+{{define "artifact_repository_group"}}
+<tr class="artifact-repository-group-row expanded">
+    <td>
+        <button type="button" class="ci-config-toggle" aria-expanded="true" onclick="toggleArtifactRegistryGroup(this)">
+            <span class="chevron">›</span>
+        </button>
+    </td>
+    <td>
+        <div>{{.Repository}} <span class="badge">{{len .Artifacts}} 个产物</span></div>
+        <div class="ci-config-module-path" title="{{.RegistryURL}}">{{.RegistryName}} / {{.RegistryURL}}</div>
+    </td>
+    <td style="color:#868e96;font-size:0.8rem">点击展开</td>
+    <td style="color:#868e96;font-size:0.8rem">按 Tag 显示</td>
+    <td>{{if .Namespace}}{{.Namespace}}{{else}}全部{{end}}</td>
+    <td>
+        {{if gt .PresentCount 0}}<span class="badge badge-success">存在 {{.PresentCount}}</span>{{end}}
+        {{if gt .DeletedCount 0}}<span class="badge badge-deleted">已删 {{.DeletedCount}}</span>{{end}}
+    </td>
+    <td>
+        {{with .LastSyncedAt}}
+            <div style="font-size:0.8rem" title="{{formatTimeFull .}}">{{formatTime .}}</div>
+        {{end}}
+        {{with .LatestPushedAt}}
+            <div class="ci-config-module-path">{{formatTime .}}</div>
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">无推送时间</span>
+        {{end}}
+    </td>
+    <td></td>
+</tr>
+{{range .Artifacts}}{{template "artifact_row" .}}{{else}}
+<tr class="artifact-item-row is-visible">
+    <td></td>
+    <td colspan="7" style="color:#868e96">暂无产物数据，请先同步镜像仓库</td>
+</tr>
+{{end}}
+{{end}}
+
+{{define "artifact_registry_row"}}
+<tr id="artifact-registry-{{.ID}}">
+    <td>{{.Name}}</td>
+    <td>{{.Provider}}</td>
+    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.RegistryURL}}</td>
+    <td>{{if .Namespace}}{{.Namespace}}{{else}}全部{{end}}</td>
+    <td>
+        {{if .Enabled}}
+            <span class="badge badge-success">启用</span>
+        {{else}}
+            <span class="badge badge-missing">停用</span>
+        {{end}}
+        {{with deref .LastSyncStatus}}
+            {{if eq . "success"}}<span class="badge badge-success">同步成功</span>{{end}}
+            {{if eq . "failed"}}<span class="badge badge-failed">同步失败</span>{{end}}
+            {{if eq . "running"}}<span class="badge badge-running">同步中</span>{{end}}
+        {{end}}
+    </td>
+    <td>
+        {{with .LastSyncedAt}}
+            <span style="font-size:0.8rem" title="{{formatTimeFull .}}">{{formatTime .}}</span>
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">未同步</span>
+        {{end}}
+    </td>
+    <td>
+        <div class="actions">
+            <button onclick="openEditModal('/artifact-registries/{{.ID}}/edit')">编辑</button>
+            <button class="danger" hx-delete="/artifact-registries/{{.ID}}" hx-confirm="确定要删除镜像仓库&quot;{{.Name}}&quot;吗？">删除</button>
+        </div>
+    </td>
+</tr>
+{{end}}
+
+{{define "artifact_row"}}
+<tr id="artifact-{{.ID}}" class="artifact-item-row is-visible">
+    <td></td>
+    <td>
+        <div class="ci-config-module-name" title="{{.ImageRef}}">{{.Repository}}</div>
+        <div class="ci-config-module-path">{{.RegistryName}}</div>
+    </td>
+    <td>{{.Tag}}</td>
+    <td style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{deref .Digest}}">{{truncate 18 (deref .Digest)}}</td>
+    <td>{{formatBytes .SizeBytes}}</td>
+    <td>{{formatTime .PushedAt}}</td>
+    <td>
+        {{if eq .RemoteStatus "present"}}
+            <span class="badge badge-success">存在</span>
+        {{else if eq .RemoteStatus "deleted"}}
+            <span class="badge badge-deleted">已删除</span>
+        {{else}}
+            <span class="badge">{{.RemoteStatus}}</span>
+        {{end}}
+    </td>
+    <td>
+        <div>{{formatTime .LastSyncedAt}}</div>
+        <div class="ci-config-module-path">{{formatTime .PushedAt}}</div>
+    </td>
+    <td></td>
+</tr>
+{{end}}
+
+{{define "artifact_registry_fields"}}
+<div class="field">
+    <label>名称</label>
+    <input type="text" name="name" value="{{with .Registry}}{{.Name}}{{end}}" placeholder="如 阿里云杭州" required maxlength="255">
+</div>
+<div class="field-row">
+    <div class="field">
+        <label>类型</label>
+        {{$provider := ""}}{{with .Registry}}{{$provider = .Provider}}{{end}}
+        <select name="provider">
+            <option value="generic" {{if eq $provider ""}}selected{{else if eq $provider "generic"}}selected{{end}}>Generic Registry</option>
+            <option value="aws_ecr" {{if eq $provider "aws_ecr"}}selected{{end}}>AWS ECR</option>
+            <option value="aliyun_acr" {{if eq $provider "aliyun_acr"}}selected{{end}}>阿里云 ACR</option>
+        </select>
+    </div>
+    <div class="field">
+        <label>认证</label>
+        {{$authType := ""}}{{with .Registry}}{{$authType = .AuthType}}{{end}}
+        <select name="auth_type">
+            <option value="basic" {{if eq $authType ""}}selected{{else if eq $authType "basic"}}selected{{end}}>Basic</option>
+            <option value="bearer" {{if eq $authType "bearer"}}selected{{end}}>Bearer Token</option>
+        </select>
+    </div>
+</div>
+<div class="field">
+    <label>仓库地址</label>
+    <input type="text" name="registry_url" value="{{with .Registry}}{{.RegistryURL}}{{end}}" placeholder="registry.cn-hangzhou.aliyuncs.com" required>
+</div>
+<div class="field">
+    <label>命名空间</label>
+    <input type="text" name="namespace" value="{{with .Registry}}{{.Namespace}}{{end}}" placeholder="为空时同步全部">
+</div>
+<div class="field">
+    <label>镜像仓库列表</label>
+    <textarea name="repository_names" rows="4" placeholder="每行一个，如 lnxall/demo-api。填写后同步会跳过 _catalog">{{with .Registry}}{{.RepositoryNames}}{{end}}</textarea>
+</div>
+<div class="field-row">
+    <div class="field">
+        <label>用户名</label>
+        <input type="text" name="username" value="{{with .Registry}}{{.Username}}{{end}}" placeholder="Basic 认证用户名">
+    </div>
+    <div class="field">
+        <label>凭据</label>
+        <input type="password" name="credential" placeholder="{{with .Registry}}留空表示不修改{{else}}密码或 token{{end}}">
+    </div>
+</div>
+<div class="field">
+    <label style="display:flex;align-items:center;gap:0.4rem;font-weight:500">
+        <input type="checkbox" name="enabled" style="width:auto" {{with .Registry}}{{if .Enabled}}checked{{end}}{{else}}checked{{end}}>
+        启用
+    </label>
+</div>
+{{end}}
+
+{{define "artifact_registry_edit_form"}}
+<div class="modal-header"><h2>编辑镜像仓库</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+<form hx-put="/artifact-registries/{{.Registry.ID}}" hx-target="#modal-container" hx-swap="innerHTML"
+      hx-on::after-request="
+        if(event.detail.successful) {
+          window.location.reload();
+        }">
+    {{template "artifact_registry_fields" .}}
+    {{with .Error}}<span class="error">{{.}}</span>{{end}}
+    <div class="modal-actions">
+        <button type="button" onclick="closeModal()">取消</button>
+        <button type="submit" class="primary">保存</button>
+    </div>
+</form>
+{{end}}

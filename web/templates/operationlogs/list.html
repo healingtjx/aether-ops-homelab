@@ -1,0 +1,61 @@
+{{define "operation_logs_page"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{template "head"}}
+<body>
+{{template "nav"}}
+<div class="content">
+<main>
+<h1>操作日志{{if .TitleSuffix}} - {{.TitleSuffix}}{{end}}</h1>
+
+<div style="display:flex;gap:0.5rem;margin-bottom:1rem;align-items:center">
+    <select id="filter-project" name="project_id"
+            hx-get="/operation-logs/rows" hx-target="#operation-logs-results" hx-swap="outerHTML" hx-trigger="change"
+            hx-include="#filter-application" hx-vals='{"page":"1"}'>
+        <option value="">全部项目</option>
+        {{range .Projects}}<option value="{{.ID}}" {{if eq .ID $.SelectedProjectID}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <select id="filter-application" name="application_id"
+            hx-get="/operation-logs/rows" hx-target="#operation-logs-results" hx-swap="outerHTML" hx-trigger="change"
+            hx-include="#filter-project" hx-vals='{"page":"1"}'>
+        <option value="">全部应用</option>
+        {{range .Applications}}<option value="{{.ID}}" {{if eq .ID $.SelectedApplicationID}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    {{if .BackURL}}<a href="{{.BackURL}}" class="btn" style="margin-left:auto">返回应用</a>{{end}}
+</div>
+
+{{template "operation_logs_results" .}}
+</main>
+</div>
+</body>
+</html>
+{{end}}
+
+{{define "operation_logs_results"}}
+<div id="operation-logs-results">
+    <table>
+        <thead><tr><th>项目</th><th>应用</th><th>发布信息</th><th>操作</th><th>状态</th><th>操作人</th><th>消息</th><th>开始时间</th><th>完成时间</th></tr></thead>
+        <tbody id="logs-table-body">
+            {{range .Logs}}{{template "operation_log_row" .}}{{else}}
+            <tr><td colspan="9" style="color:#868e96;text-align:center">暂无操作日志</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    {{if .Pagination}}
+    <div style="display:flex;gap:0.5rem;margin-top:0.75rem;align-items:center;justify-content:center">
+        {{if .Pagination.HasPrev}}
+        <button hx-get="/operation-logs/rows" hx-target="#operation-logs-results" hx-swap="outerHTML"
+                hx-include="#filter-project,#filter-application"
+                hx-vals='{"page":"{{.Pagination.PrevPage}}"}'>上一页</button>
+        {{end}}
+        <span style="font-size:0.85rem;color:#868e96">{{.Pagination.Page}} / {{.Pagination.TotalPages}}</span>
+        {{if .Pagination.HasNext}}
+        <button hx-get="/operation-logs/rows" hx-target="#operation-logs-results" hx-swap="outerHTML"
+                hx-include="#filter-project,#filter-application"
+                hx-vals='{"page":"{{.Pagination.NextPage}}"}'>下一页</button>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}

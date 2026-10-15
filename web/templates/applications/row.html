@@ -1,0 +1,30 @@
+{{define "application_row"}}
+<tr id="app-{{.ID}}">
+    <td>{{.ProjectName}}</td>
+    <td>{{.Name}}</td>
+    <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.GitURL}}</td>
+    <td>{{.DefaultBranch}}</td>
+    <td>
+        {{with deref .LastPullStatus}}
+            {{if eq . "success"}}
+                <span style="color:#2b8a3e;font-size:0.8rem" title="{{formatTime $.LastPulledAt}}">{{formatTime $.LastPulledAt}}</span>
+            {{else if eq . "failed"}}
+                <span style="color:#cc0000;font-size:0.8rem" title="{{deref $.LastPullMessage}}">失败</span>
+            {{else if eq . "running"}}
+                <span style="color:#e67700;font-size:0.8rem">拉取中...</span>
+            {{end}}
+        {{else}}
+            <span style="color:#868e96;font-size:0.8rem">未拉取</span>
+        {{end}}
+    </td>
+    <td>
+        <div class="actions">
+            <button class="primary" onclick="pullWithLog({{.ID}})">拉取</button>
+            <a href="/applications/{{.ID}}/logs" class="btn">日志</a>
+            <button onclick="openEditModal('/applications/{{.ID}}/edit')">编辑</button>
+            <button class="danger" hx-delete="/applications/{{.ID}}" hx-target="closest tr" hx-swap="outerHTML"
+                    hx-confirm="确定要删除应用&quot;{{.Name}}&quot;吗？">删除</button>
+        </div>
+    </td>
+</tr>
+{{end}}

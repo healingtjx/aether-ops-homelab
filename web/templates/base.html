@@ -1,0 +1,687 @@
+{{define "head"}}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherOps</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f8f9fa; color: #212529; display: flex; min-height: 100vh; }
+        .sidebar { width: 220px; background: #1a1d23; color: #c9d1d9; display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+        .sidebar-brand { padding: 1.25rem 1.25rem 1rem; font-size: 1.15rem; font-weight: 700; color: #fff; border-bottom: 1px solid #2d3139; letter-spacing: 0.02em; }
+        .sidebar nav { display: flex; flex-direction: column; padding: 0.5rem 0; flex: 1; overflow-y: auto; }
+        .nav-group { display: flex; flex-direction: column; margin: 0.15rem 0; }
+        .nav-group-title { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: #c9d1d9; font-size: 0.88rem; font-weight: 600; border-left: 3px solid transparent; }
+        .nav-group-title svg { width: 18px; height: 18px; flex-shrink: 0; }
+        .nav-group.active .nav-group-title { color: #fff; border-left-color: #58a6ff; background: #242830; }
+        .nav-submenu { display: flex; flex-direction: column; padding: 0.15rem 0 0.35rem; }
+        .sidebar nav a { text-decoration: none; color: #8b949e; font-weight: 500; padding: 0.48rem 1.25rem 0.48rem 3.1rem; font-size: 0.86rem; border-radius: 0; transition: all 0.15s; display: flex; align-items: center; border-left: 3px solid transparent; }
+        .sidebar nav a:hover { color: #f0f6fc; background: #2d3139; }
+        .sidebar nav a.active { color: #fff; background: #2d3139; border-left-color: #58a6ff; }
+        .content { margin-left: 220px; flex: 1; padding: 1.5rem 2rem; min-width: 0; }
+        h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid #e9ecef; }
+        th { background: #f1f3f5; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: #495057; }
+        td { font-size: 0.925rem; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8f9fa; }
+        .error { color: #cc0000; font-size: 0.8rem; display: block; margin-top: 0.15rem; }
+        button, .btn { padding: 0.3rem 0.75rem; cursor: pointer; border: 1px solid #ced4da; border-radius: 4px; background: #fff; font-size: 0.825rem; color: #495057; transition: all 0.15s; }
+        button:hover { background: #e9ecef; border-color: #adb5bd; }
+        button.primary { background: #0066cc; color: #fff; border-color: #0066cc; }
+        button.primary:hover { background: #0052a3; }
+        button:disabled, button:disabled:hover { cursor: not-allowed; opacity: 0.65; }
+        button.danger { color: #cc0000; border-color: #ffc9c9; }
+        button.danger:hover { background: #fff5f5; border-color: #cc0000; }
+        input, textarea, select { padding: 0.35rem 0.6rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.875rem; width: 100%; font-family: inherit; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 2px rgba(0,102,204,0.15); }
+        .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+        .badge-ssh { background: #d3f9d8; color: #2b8a3e; }
+        .badge-https { background: #d0ebff; color: #1864ab; }
+        .badge-success { background: #d3f9d8; color: #2b8a3e; }
+        .badge-failed { background: #ffe3e3; color: #c92a2a; }
+        .badge-running { background: #fff3bf; color: #e67700; }
+        .badge-pull { background: #e7f5ff; color: #1971c2; }
+        .badge-deploy { background: #f3d9fa; color: #9c36b5; }
+        .badge-missing { background: #f1f3f5; color: #868e96; }
+        .badge-deleted { background: #ffe3e3; color: #c92a2a; }
+        .actions { display: flex; gap: 0.35rem; white-space: nowrap; }
+        .ci-config-group-row td { background: #fff; font-weight: 600; }
+        .ci-config-group-row:hover td { background: #f1f3f5; }
+        .artifact-registry-group-row td { background: #fff; font-weight: 600; }
+        .artifact-registry-group-row:hover td { background: #f1f3f5; }
+        .artifact-repository-group-row td { background: #fff; font-weight: 600; }
+        .artifact-repository-group-row:hover td { background: #f1f3f5; }
+        .ci-config-toggle { width: 2rem; padding-left: 0; padding-right: 0; }
+        .ci-config-toggle .chevron { display: inline-block; transition: transform 0.15s; }
+        .ci-config-group-row.expanded .chevron { transform: rotate(90deg); }
+        .artifact-registry-group-row.expanded .chevron { transform: rotate(90deg); }
+        .artifact-repository-group-row.expanded .chevron { transform: rotate(90deg); }
+        .ci-config-module-row { display: none; }
+        .ci-config-module-row.is-visible { display: table-row; }
+        .ci-config-module-row td { background: #fbfcfd; }
+        .artifact-item-row { display: none; }
+        .artifact-item-row.is-visible { display: table-row; }
+        .artifact-item-row td { background: #fbfcfd; }
+        .ci-config-module-name { font-weight: 600; color: #343a40; }
+        .ci-config-module-path { margin-top: 0.15rem; color: #868e96; font-size: 0.78rem; }
+        .ci-config-vars { color: #495057; font-size: 0.8rem; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .page-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.75rem; }
+        .page-toolbar h1 { margin: 0; }
+        .toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }
+        .toolbar-actions select { width: 220px; }
+        .sync-message { min-height: 1.6rem; margin: 0.35rem 0; padding: 0.45rem 0.65rem; border-radius: 4px; font-size: 0.85rem; color: #495057; background: transparent; }
+        .sync-message.is-running { color: #e67700; background: #fff9db; border: 1px solid #ffec99; }
+        .sync-message.is-success { color: #2b8a3e; background: #ebfbee; border: 1px solid #b2f2bb; }
+        .sync-message.is-error { color: #c92a2a; background: #fff5f5; border: 1px solid #ffc9c9; }
+        .button-spinner { display: none; width: 0.85rem; height: 0.85rem; margin-right: 0.35rem; border: 2px solid rgba(255,255,255,0.55); border-top-color: #fff; border-radius: 50%; vertical-align: -0.12rem; animation: spin 0.8s linear infinite; }
+        button.is-loading .button-spinner { display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 10px;
+            width: 520px; max-width: 90vw; max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+            padding: 1.5rem;
+        }
+        .modal h2 { font-size: 1.15rem; margin-top: 0; margin-bottom: 1rem; }
+        .modal .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .modal .modal-close { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: #868e96; padding: 0; line-height: 1; }
+        .modal .modal-close:hover { color: #212529; }
+        .modal .field { margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.2rem; }
+        .modal .field label { font-size: 0.8rem; font-weight: 600; color: #495057; }
+        .modal .field-row { display: flex; gap: 0.5rem; }
+        .modal .field-row .field { flex: 1; }
+        .modal .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+        .deploy-run-vars { margin-bottom: 0.75rem; border: 1px solid #e9ecef; border-radius: 6px; background: #fbfcfd; }
+        .deploy-run-vars summary { cursor: pointer; padding: 0.55rem 0.65rem; font-size: 0.8rem; font-weight: 600; color: #495057; user-select: none; }
+        .deploy-run-vars summary:hover { background: #f1f3f5; }
+        .deploy-run-vars-body { padding: 0 0.65rem 0.65rem; }
+        .variable-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.4rem; }
+        .variable-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto; gap: 0.4rem; align-items: center; }
+        .variable-row button { white-space: nowrap; }
+        .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+        .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+
+        /* Log Modal */
+        .log-modal {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            padding: 1rem;
+            border-radius: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-bottom: 0.75rem;
+        }
+        .log-modal .log-line-success { color: #73c991; }
+        .log-modal .log-line-failed { color: #f44747; }
+        .log-modal .log-status { text-align: center; padding: 0.5rem; font-weight: 600; border-radius: 4px; margin-top: 0.5rem; }
+        .log-modal .log-status-success { background: #2b8a3e22; color: #73c991; }
+        .log-modal .log-status-failed { background: #c92a2a22; color: #f44747; }
+        .settings-section { max-width: 720px; background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .settings-section h2 { font-size: 1rem; margin: 0 0 1rem; color: #343a40; }
+        .settings-section .field { margin-bottom: 0.85rem; display: flex; flex-direction: column; gap: 0.25rem; }
+        .settings-section .field label { font-size: 0.82rem; font-weight: 600; color: #495057; }
+        .form-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+        .success { color: #2b8a3e; font-size: 0.8rem; display: block; margin-top: 0.15rem; }
+    </style>
+</head>
+{{end}}
+
+{{define "nav"}}
+<aside class="sidebar">
+    <div class="sidebar-brand">AetherOps</div>
+    <nav>
+        <div class="nav-group">
+            <div class="nav-group-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5A1.5 1.5 0 013.5 2h3A1.5 1.5 0 018 3.5v3A1.5 1.5 0 016.5 8h-3A1.5 1.5 0 012 6.5v-3zM10 3.5A1.5 1.5 0 0111.5 2h1A1.5 1.5 0 0114 3.5v1A1.5 1.5 0 0112.5 6h-1A1.5 1.5 0 0110 4.5v-1zM2 11.5A1.5 1.5 0 013.5 10h1A1.5 1.5 0 016 11.5v1A1.5 1.5 0 014.5 14h-1A1.5 1.5 0 012 12.5v-1zM10 9.5A1.5 1.5 0 0111.5 8h3A1.5 1.5 0 0116 9.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 0110 12.5v-3z"/></svg>项目管理</div>
+            <div class="nav-submenu">
+                <a href="/projects" data-path="/projects">项目</a>
+                <a href="/applications" data-path="/applications">应用</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2l8 6-8 6V2z"/></svg>测试运维</div>
+            <div class="nav-submenu">
+                <a href="/release-scripts" data-path="/release-scripts">脚本管理</a>
+                <a href="/ci-configs" data-path="/ci-configs">CI 配置</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/></svg>产物管理</div>
+            <div class="nav-submenu">
+                <a href="/artifacts" data-path="/artifacts">产物管理</a>
+                <a href="/docker-deployments" data-path="/docker-deployments">产物发布</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v2M8 12v2M3.76 3.76l1.42 1.42M10.82 10.82l1.42 1.42M2 8h2M12 8h2M3.76 12.24l1.42-1.42M10.82 5.18l1.42-1.42"/><circle cx="8" cy="8" r="2.5"/></svg>系统管理</div>
+            <div class="nav-submenu">
+                <a href="/global-config" data-path="/global-config">全局配置</a>
+                <a href="/operation-logs" data-path="/operation-logs">操作日志</a>
+            </div>
+        </div>
+    </nav>
+    <div style="padding:0.75rem 1.25rem;border-top:1px solid #2d3139;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:0.8rem;color:#8b949e">{{.CurrentUser}}</span>
+        <form method="POST" action="/logout" style="margin:0"><button style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:0.8rem;padding:0" onmouseover="this.style.color='#f0f6fc'" onmouseout="this.style.color='#8b949e'">登出</button></form>
+    </div>
+</aside>
+<script>
+(function(){
+    var path = window.location.pathname;
+    var links = document.querySelectorAll('.sidebar nav a');
+    var matched = path.indexOf('/applications/') === 0 && path.indexOf('/logs') > -1
+        ? document.querySelector('.sidebar nav a[data-path="/operation-logs"]')
+        : null;
+    if (!matched) {
+        for (var i = 0; i < links.length; i++) {
+            var linkPath = links[i].getAttribute('data-path');
+            if (path === linkPath || path.indexOf(linkPath + '/') === 0) {
+                matched = links[i];
+                break;
+            }
+        }
+    }
+    if (matched) {
+        matched.classList.add('active');
+        var group = matched.closest('.nav-group');
+        if (group) group.classList.add('active');
+    }
+})();
+</script>
+{{end}}
+
+{{define "modal"}}
+<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modal-container"></div>
+</div>
+<script>
+function redirectToLogin(path) {
+    window.location.href = path || '/bs';
+}
+function handleAuthExpiredResponse(resp) {
+    if (resp && resp.status === 401) {
+        redirectToLogin(resp.headers.get('X-Login-Path'));
+        return true;
+    }
+    return false;
+}
+function authExpiredError() {
+    var err = new Error('登录信息已过期');
+    err.authExpired = true;
+    return err;
+}
+document.body.addEventListener('htmx:responseError', function(event) {
+    var xhr = event.detail && event.detail.xhr;
+    if (xhr && xhr.status === 401) {
+        redirectToLogin(xhr.getResponseHeader('X-Login-Path') || xhr.getResponseHeader('Location'));
+    }
+});
+function openCreateModal(templateId) {
+    var container = document.getElementById('modal-container');
+    container.innerHTML = '';
+    var tpl = document.getElementById(templateId);
+    container.appendChild(tpl.content.cloneNode(true));
+    htmx.process(container);
+    document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.getElementById('modal-container').innerHTML = '';
+}
+function openEditModal(url) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-container').innerHTML = '<div style="text-align:center;padding:2rem">加载中...</div>';
+    htmx.ajax('GET', url, {target: '#modal-container', swap: 'innerHTML'});
+}
+function addVariableRow(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    var row = document.createElement('div');
+    row.className = 'variable-row';
+    row.innerHTML =
+        '<input type="text" name="variable_key" placeholder="变量名">' +
+        '<input type="text" name="variable_value" placeholder="变量值">' +
+        '<button type="button" onclick="removeVariableRow(this)">删除</button>';
+    container.appendChild(row);
+}
+function confirmDeleteAction(message) {
+    var promptMessage = (message ? message + '\n\n' : '') + '请输入“确认删除”以继续。';
+    return window.prompt(promptMessage) === '确认删除';
+}
+function removeVariableRow(button) {
+    var row = button.closest('.variable-row');
+    var list = row ? row.parentElement : null;
+    if (!row || !list) return;
+    if (!confirmDeleteAction('确定要删除该变量吗？')) return;
+    if (list.querySelectorAll('.variable-row').length <= 1) {
+        var inputs = row.querySelectorAll('input');
+        for (var i = 0; i < inputs.length; i++) inputs[i].value = '';
+        return;
+    }
+    row.remove();
+}
+function toggleCIConfigGroup(button) {
+    var groupRow = button.closest('tr');
+    if (!groupRow) return;
+    var expanded = !groupRow.classList.contains('expanded');
+    groupRow.classList.toggle('expanded', expanded);
+    button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+    var row = groupRow.nextElementSibling;
+    while (row && row.classList.contains('ci-config-module-row')) {
+        row.classList.toggle('is-visible', expanded);
+        row = row.nextElementSibling;
+    }
+}
+function toggleArtifactRegistryGroup(button) {
+    var groupRow = button.closest('tr');
+    if (!groupRow) return;
+    var expanded = !groupRow.classList.contains('expanded');
+    groupRow.classList.toggle('expanded', expanded);
+    button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+    var row = groupRow.nextElementSibling;
+    while (row && row.classList.contains('artifact-item-row')) {
+        row.classList.toggle('is-visible', expanded);
+        row = row.nextElementSibling;
+    }
+}
+function updateArtifactSyncButton() {
+    var select = document.getElementById('artifact-sync-registry');
+    var button = document.getElementById('artifact-sync-button');
+    if (!select || !button || button.classList.contains('is-loading')) return;
+    button.disabled = !select.value;
+}
+function setArtifactSyncMessage(type, message) {
+    var box = document.getElementById('artifact-sync-message');
+    if (!box) return;
+    box.className = 'sync-message';
+    if (type) box.classList.add('is-' + type);
+    box.textContent = message || '';
+}
+function syncArtifactRegistry() {
+    var select = document.getElementById('artifact-sync-registry');
+    var button = document.getElementById('artifact-sync-button');
+    if (!select || !button || !select.value || button.classList.contains('is-loading')) return;
+
+    var registryName = select.options[select.selectedIndex].text;
+    var label = button.querySelector('.button-label');
+    button.classList.add('is-loading');
+    button.disabled = true;
+    select.disabled = true;
+    if (label) label.textContent = '同步中...';
+    setArtifactSyncMessage('running', '正在同步仓库：' + registryName + '，请勿重复提交。');
+
+    fetch('/artifact-registries/' + encodeURIComponent(select.value) + '/sync', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'fetch'}
+    }).then(function(resp) {
+        if (handleAuthExpiredResponse(resp)) throw authExpiredError();
+        return resp.text().then(function(text) {
+            if (!resp.ok) {
+                var err = new Error(text || '同步失败');
+                err.status = resp.status;
+                throw err;
+            }
+            return text;
+        });
+    }).then(function(text) {
+        setArtifactSyncMessage('success', text || '同步完成');
+        window.setTimeout(function() {
+            window.location.reload();
+        }, 800);
+    }).catch(function(err) {
+        if (err.authExpired) return;
+        var message = err.message || '同步失败';
+        if (err.status === 409 && !message) message = '该仓库正在同步中，请稍后';
+        setArtifactSyncMessage('error', message);
+        button.classList.remove('is-loading');
+        select.disabled = false;
+        if (label) label.textContent = '同步仓库';
+        updateArtifactSyncButton();
+    });
+}
+function pullWithLog(appId) {
+    var container = document.getElementById('modal-container');
+    container.innerHTML =
+        '<div class="modal-header"><h2>拉取日志</h2><button class="modal-close" onclick="closePullLog()">&times;</button></div>' +
+        '<div class="log-modal" id="pull-log-output"></div>' +
+        '<div id="pull-log-status"></div>' +
+        '<div class="modal-actions"><button id="pull-log-close-btn" onclick="closePullLog()" disabled>关闭</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+
+    var output = document.getElementById('pull-log-output');
+    var statusDiv = document.getElementById('pull-log-status');
+    var closeBtn = document.getElementById('pull-log-close-btn');
+
+    var es = new EventSource('/applications/' + appId + '/pull/stream');
+    window._pullLogES = es;
+
+    es.addEventListener('auth-expired', function(e) {
+        es.close();
+        window._pullLogES = null;
+        redirectToLogin(e.data);
+    });
+
+    es.addEventListener('log', function(e) {
+        var line = document.createElement('div');
+        line.textContent = e.data;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    });
+
+    es.addEventListener('done', function(e) {
+        es.close();
+        window._pullLogES = null;
+        var status = e.data;
+        var label = status === 'success' ? '拉取成功' : '拉取失败';
+        statusDiv.innerHTML = '<div class="log-status log-status-' + status + '">' + label + '</div>';
+        closeBtn.disabled = false;
+        htmx.ajax('GET', '/applications/' + appId + '/row', {target: '#app-' + appId, swap: 'outerHTML'});
+    });
+
+    es.onerror = function() {
+        es.close();
+        window._pullLogES = null;
+        closeBtn.disabled = false;
+    };
+}
+function closePullLog() {
+    if (window._pullLogES) {
+        window._pullLogES.close();
+        window._pullLogES = null;
+    }
+    closeModal();
+}
+function runDeploy(configId) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-container').innerHTML = '<div style="text-align:center;padding:2rem">加载中...</div>';
+    htmx.ajax('GET', '/ci-configs/' + configId + '/run/confirm', {target: '#modal-container', swap: 'innerHTML'});
+}
+function submitDeployRun(event, form, configId) {
+    event.preventDefault();
+    var errorBox = document.getElementById('deploy-run-error');
+    if (errorBox) errorBox.innerHTML = '';
+
+    fetch('/ci-configs/' + configId + '/run/prepare', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'fetch'},
+        body: new FormData(form)
+    }).then(function(resp) {
+        if (handleAuthExpiredResponse(resp)) throw authExpiredError();
+        return resp.text().then(function(text) {
+            if (!resp.ok) throw new Error(text || '测试准备失败');
+            return text;
+        });
+    }).then(function(token) {
+        openDeployLog(configId, token.trim());
+    }).catch(function(err) {
+        if (err.authExpired) return;
+        if (errorBox) errorBox.innerHTML = '<span class="error">' + err.message + '</span>';
+    });
+}
+function openDeployLog(configId, token) {
+    var container = document.getElementById('modal-container');
+    container.innerHTML =
+        '<div class="modal-header"><h2>部署日志</h2><button class="modal-close" onclick="closeDeployLog()">&times;</button></div>' +
+        '<div class="log-modal" id="deploy-log-output"></div>' +
+        '<div id="deploy-log-status"></div>' +
+        '<div class="modal-actions"><button id="deploy-log-close-btn" onclick="closeDeployLog()" disabled>关闭</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+
+    var output = document.getElementById('deploy-log-output');
+    var statusDiv = document.getElementById('deploy-log-status');
+    var closeBtn = document.getElementById('deploy-log-close-btn');
+
+    var url = '/ci-configs/' + configId + '/run/stream';
+    if (token) url += '?token=' + encodeURIComponent(token);
+    var es = new EventSource(url);
+    window._deployLogES = es;
+
+    es.addEventListener('auth-expired', function(e) {
+        es.close();
+        window._deployLogES = null;
+        redirectToLogin(e.data);
+    });
+
+    es.addEventListener('log', function(e) {
+        var line = document.createElement('div');
+        line.textContent = e.data;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    });
+
+    es.addEventListener('done', function(e) {
+        es.close();
+        window._deployLogES = null;
+        var status = e.data;
+        var label = status === 'success' ? '部署成功' : '部署失败';
+        statusDiv.innerHTML = '<div class="log-status log-status-' + status + '">' + label + '</div>';
+        closeBtn.disabled = false;
+        htmx.ajax('GET', '/ci-configs/' + configId + '/row', {target: '#ciconfig-' + configId, swap: 'outerHTML'});
+    });
+
+    es.onerror = function() {
+        es.close();
+        window._deployLogES = null;
+        closeBtn.disabled = false;
+    };
+}
+function closeDeployLog() {
+    if (window._deployLogES) {
+        window._deployLogES.close();
+        window._deployLogES = null;
+    }
+    closeModal();
+}
+function runArtifactBuild(configId, refreshConfigId) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-container').innerHTML = '<div style="text-align:center;padding:2rem">加载中...</div>';
+    window._artifactBuildRefreshConfigId = refreshConfigId || null;
+    htmx.ajax('GET', '/artifact-builds/' + configId + '/run/confirm', {target: '#modal-container', swap: 'innerHTML'});
+}
+function toggleArtifactBuildRegistry(modeSelect) {
+    var form = modeSelect.closest('form');
+    if (!form) return;
+    var field = form.querySelector('[data-role="artifact-registry-field"]');
+    var registry = form.querySelector('[data-role="artifact-registry"]');
+    var dockerMode = modeSelect.value === 'docker';
+    if (field) field.style.display = dockerMode ? '' : 'none';
+    if (registry) registry.required = dockerMode;
+}
+function startArtifactBuildRun(event, form, configId) {
+    event.preventDefault();
+    var errorBox = document.getElementById('artifact-build-run-error');
+    if (errorBox) errorBox.innerHTML = '';
+
+    fetch('/artifact-builds/' + configId + '/run/prepare', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'fetch'},
+        body: new FormData(form)
+    }).then(function(resp) {
+        if (handleAuthExpiredResponse(resp)) throw authExpiredError();
+        return resp.text().then(function(text) {
+            if (!resp.ok) throw new Error(text || '打包准备失败');
+            return text;
+        });
+    }).then(function(token) {
+        openArtifactBuildLog(configId, token.trim());
+    }).catch(function(err) {
+        if (err.authExpired) return;
+        if (errorBox) errorBox.innerHTML = '<span class="error">' + err.message + '</span>';
+    });
+}
+function openArtifactBuildLog(configId, token) {
+    var container = document.getElementById('modal-container');
+    container.innerHTML =
+        '<div class="modal-header"><h2>打包日志</h2><button class="modal-close" onclick="closeArtifactBuildLog()">&times;</button></div>' +
+        '<div class="log-modal" id="artifact-build-log-output"></div>' +
+        '<div id="artifact-build-log-status"></div>' +
+        '<div class="modal-actions"><button id="artifact-build-log-close-btn" onclick="closeArtifactBuildLog()" disabled>关闭</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+
+    var output = document.getElementById('artifact-build-log-output');
+    var statusDiv = document.getElementById('artifact-build-log-status');
+    var closeBtn = document.getElementById('artifact-build-log-close-btn');
+
+    var url = '/artifact-builds/' + configId + '/run/stream';
+    if (token) url += '?token=' + encodeURIComponent(token);
+    var es = new EventSource(url);
+    window._artifactBuildLogES = es;
+
+    es.addEventListener('log', function(e) {
+        var line = document.createElement('div');
+        line.textContent = e.data;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    });
+
+    es.addEventListener('done', function(e) {
+        es.close();
+        window._artifactBuildLogES = null;
+        var status = e.data;
+        var label = status === 'success' ? '打包成功' : '打包失败';
+        statusDiv.innerHTML = '<div class="log-status log-status-' + status + '">' + label + '</div>';
+        closeBtn.disabled = false;
+        if (window._artifactBuildRefreshConfigId) {
+            htmx.ajax('GET', '/ci-configs/' + window._artifactBuildRefreshConfigId + '/row', {target: '#ciconfig-' + window._artifactBuildRefreshConfigId, swap: 'outerHTML'});
+        }
+    });
+
+    es.onerror = function() {
+        es.close();
+        window._artifactBuildLogES = null;
+        closeBtn.disabled = false;
+    };
+}
+function closeArtifactBuildLog() {
+    if (window._artifactBuildLogES) {
+        window._artifactBuildLogES.close();
+        window._artifactBuildLogES = null;
+    }
+    window._artifactBuildRefreshConfigId = null;
+    closeModal();
+}
+function runArtifactDeploy(mappingId) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-container').innerHTML = '<div style="text-align:center;padding:2rem">加载中...</div>';
+    htmx.ajax('GET', '/docker-deployments/' + mappingId + '/run/confirm', {target: '#modal-container', swap: 'innerHTML'});
+}
+function submitArtifactDeployRun(event, form, mappingId) {
+    event.preventDefault();
+    var errorBox = document.getElementById('artifact-deploy-run-error');
+    if (errorBox) errorBox.innerHTML = '';
+
+    fetch('/docker-deployments/' + mappingId + '/run/prepare', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'fetch'},
+        body: new FormData(form)
+    }).then(function(resp) {
+        if (handleAuthExpiredResponse(resp)) throw authExpiredError();
+        return resp.text().then(function(text) {
+            if (!resp.ok) throw new Error(text || '发布准备失败');
+            return text;
+        });
+    }).then(function(token) {
+        openArtifactDeployLog(mappingId, token.trim());
+    }).catch(function(err) {
+        if (err.authExpired) return;
+        if (errorBox) errorBox.innerHTML = '<span class="error">' + err.message + '</span>';
+    });
+}
+function openArtifactDeployLog(mappingId, token) {
+    var container = document.getElementById('modal-container');
+    container.innerHTML =
+        '<div class="modal-header"><h2>产物发布日志</h2><button class="modal-close" onclick="closeArtifactDeployLog()">&times;</button></div>' +
+        '<div class="log-modal" id="artifact-deploy-log-output"></div>' +
+        '<div id="artifact-deploy-log-status"></div>' +
+        '<div class="modal-actions"><button id="artifact-deploy-log-close-btn" onclick="closeArtifactDeployLog()" disabled>关闭</button></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+
+    var output = document.getElementById('artifact-deploy-log-output');
+    var statusDiv = document.getElementById('artifact-deploy-log-status');
+    var closeBtn = document.getElementById('artifact-deploy-log-close-btn');
+
+    var es = new EventSource('/docker-deployments/' + mappingId + '/run/stream?token=' + encodeURIComponent(token));
+    window._artifactDeployLogES = es;
+
+    es.addEventListener('log', function(e) {
+        var line = document.createElement('div');
+        line.textContent = e.data;
+        output.appendChild(line);
+        output.scrollTop = output.scrollHeight;
+    });
+
+    es.addEventListener('done', function(e) {
+        es.close();
+        window._artifactDeployLogES = null;
+        var status = e.data;
+        var label = status === 'success' ? '发布成功' : '发布失败';
+        statusDiv.innerHTML = '<div class="log-status log-status-' + status + '">' + label + '</div>';
+        closeBtn.disabled = false;
+        htmx.ajax('GET', '/docker-deployments/' + mappingId + '/row', {target: '#docker-deployment-' + mappingId, swap: 'outerHTML'});
+    });
+
+    es.onerror = function() {
+        es.close();
+        window._artifactDeployLogES = null;
+        closeBtn.disabled = false;
+    };
+}
+function openArtifactDeployLatestLog(mappingId) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-container').innerHTML = '<div style="text-align:center;padding:2rem">加载中...</div>';
+    htmx.ajax('GET', '/docker-deployments/' + mappingId + '/runs/latest', {target: '#modal-container', swap: 'innerHTML'});
+}
+function closeArtifactDeployLog() {
+    if (window._artifactDeployLogES) {
+        window._artifactDeployLogES.close();
+        window._artifactDeployLogES = null;
+    }
+    closeModal();
+}
+function filterDockerDeploymentRepositories(form) {
+    if (!form) return;
+    var registry = form.querySelector('select[name="registry_id"]');
+    var repository = form.querySelector('select[data-role="docker-repository"]');
+    if (!registry || !repository) return;
+    var selectedRegistry = registry.value;
+    var selectedVisible = false;
+    for (var i = 0; i < repository.options.length; i++) {
+        var option = repository.options[i];
+        var optionRegistry = option.getAttribute('data-registry-id');
+        var visible = !optionRegistry || !selectedRegistry || optionRegistry === selectedRegistry;
+        option.hidden = !visible;
+        if (!visible && option.selected) option.selected = false;
+        if (visible && option.selected && option.value) selectedVisible = true;
+    }
+    if (!selectedVisible && selectedRegistry) repository.value = '';
+}
+document.body.addEventListener('htmx:confirm', function(event) {
+    var trigger = event.detail && event.detail.elt;
+    if (!trigger || !trigger.hasAttribute('hx-delete')) return;
+    event.preventDefault();
+    if (confirmDeleteAction(event.detail.question)) {
+        event.detail.issueRequest(true);
+    }
+});
+</script>
+{{end}}
