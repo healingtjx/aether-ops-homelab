@@ -81,6 +81,16 @@ func NewClient(cfg Config) (*Client, error) {
 	u.RawQuery = ""
 	u.Fragment = ""
 
+	// Empty ECR credentials use the execution host's AWS identity. Fetch a fresh
+	// password for each client instead of persisting an expiring login token.
+	if cfg.Provider == "aws_ecr" && strings.TrimSpace(cfg.Credential) == "" {
+		password, err := ecrLoginPassword(u.Hostname())
+		if err != nil {
+			return nil, err
+		}
+		cfg.AuthType, cfg.Username, cfg.Credential = AuthBasic, "AWS", password
+	}
+
 	authType := cfg.AuthType
 	if authType == "" {
 		authType = AuthBasic

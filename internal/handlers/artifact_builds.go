@@ -240,7 +240,7 @@ func (h *ArtifactBuildHandler) defaultArtifactImageTag(ctx context.Context, conf
 		return nextArtifactImageTag(prefix, nil)
 	}
 
-	repositories, err := models.ListDockerDeployRepositoriesForArtifactBuild(ctx, h.db, config.ID, *config.ArtifactRegistryID)
+	repositories, err := h.artifactBuildRepositories(ctx, config, *config.ArtifactRegistryID)
 	if err != nil || len(repositories) == 0 {
 		return nextArtifactImageTag(prefix, nil)
 	}
@@ -526,12 +526,12 @@ func (h *ArtifactBuildHandler) syncArtifactBuildImages(ctx context.Context, conf
 		return "", err
 	}
 
-	repositories, err := models.ListDockerDeployRepositoriesForArtifactBuild(ctx, h.db, config.ID, reg.ID)
+	repositories, err := h.artifactBuildRepositories(ctx, config, reg.ID)
 	if err != nil {
 		return finishFailed(err)
 	}
 	if len(repositories) == 0 {
-		return finishFailed(fmt.Errorf("未找到当前模块的发布映射，无法同步本次镜像"))
+		return finishFailed(fmt.Errorf("请配置 IMAGE_REPOSITORY 或当前模块的发布映射，无法同步本次镜像"))
 	}
 
 	client, err := newRegistryClient(reg)
@@ -594,4 +594,12 @@ func (h *ArtifactBuildHandler) syncArtifactBuildRegistries(ctx context.Context, 
 		return "", fmt.Errorf("没有启用的镜像仓库")
 	}
 	return "同步全部启用仓库完成；" + strings.Join(messages, "；"), nil
+}
+
+// A build can name its repository without requiring a deployment target.
+func (h *ArtifactBuildHandler) artifactBuildRepositories(ctx context.Context, config models.CIConfig, registryID int64) ([]string, error) {
+	if repository := strings.Trim(strings.TrimSpace(config.Variables["IMAGE_REPOSITORY"]), "/"); repository != "" {
+		return []string{repository}, nil
+	}
+	return models.ListDockerDeployRepositoriesForArtifactBuild(ctx, h.db, config.ID, registryID)
 }

@@ -437,7 +437,7 @@ func parseArtifactRegistryForm(r *http.Request, requireCredential bool) (artifac
 		input.authType = "basic"
 	}
 	input.keepCredential = !requireCredential && strings.TrimSpace(input.credential) == ""
-	if requireCredential && strings.TrimSpace(input.credential) == "" {
+	if requireCredential && input.provider != "aws_ecr" && strings.TrimSpace(input.credential) == "" {
 		return input, fmt.Errorf("凭据不能为空")
 	}
 	if input.authType == "basic" && input.username == "" {

@@ -46,3 +46,15 @@ CI 配置：
 
 已完成平台配置更新、脚本模拟验证和 Python 转发测试。
 白屏修复已应用到服务器，并重启前端 Python 服务；登录页已在浏览器验证。
+
+2026-10-21：版本号镜像打包配置
+- 打包配置 #19 tio-mg-all、#20 pc-html 已切换为 Docker 镜像模式。
+- 点击“打包”弹出版本号，输入值作为 IMAGE_TAG 传入 ECR 镜像打包脚本。
+- 仓库：tanliao AWS ECR，319966842764.dkr.ecr.ap-northeast-1.amazonaws.com。
+- 两条打包项的 IMAGE_REPOSITORY 分别为 tio-mg-all、tio-mg-pc-html。
+- IMAGE_REPOSITORY 用于打包完成后的同步及默认版本计算，无需创建部署映射。
+- 原 Linux 直接部署 CI 配置保持不变。
+- 服务器 192.168.5.4 已安装 AWS CLI，平台以 root 运行，使用该账户默认 AWS 身份。
+- ECR 仓库 credential 留空时，平台通过 AWS CLI 自动获取登录密码；区域从仓库域名解析。
+- 密钥仅保存在服务器 AWS 配置中，不写入本文或脚本备份。
+- 本次配置验证不执行镜像构建和推送。
