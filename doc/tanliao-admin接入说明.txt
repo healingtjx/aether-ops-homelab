@@ -38,7 +38,6 @@ CI 配置：
 脚本备份：
 - doc/scripts/tanliao/tanliao-admin-测试环境部署.sh
 - doc/scripts/tanliao/tanliao-admin-ECR镜像打包.sh
-- doc/scripts/tanliao/tanliao-admin-编译.sh
 - 备份正文从数据库 release_scripts 导出，与数据库内容一致。
 - Python HTTP 服务代码已内嵌在 Linux 直接部署脚本中。
 - 以数据库配置为准；平台调整脚本后重新导出到对应项目目录。
@@ -58,3 +57,11 @@ CI 配置：
 - ECR 仓库 credential 留空时，平台通过 AWS CLI 自动获取登录密码；区域从仓库域名解析。
 - 密钥仅保存在服务器 AWS 配置中，不写入本文或脚本备份。
 - 本次配置验证不执行镜像构建和推送。
+
+平台打包入口调整：
+- 打包配置 #19/#20 继续使用脚本 #8，但正文仅准备 Java/Node 环境、校验参数并调用项目 devops/build_push_prod.sh。
+- 调用方式：bash devops/build_push_prod.sh "$MODULE_NAME" "$IMAGE_TAG"，工作目录为平台拉取的项目根目录。
+- 编译、AWS 登录、Docker 构建和推送逻辑由项目仓库维护；平台不再维护第二套实现。
+- 删除无配置引用的旧编译脚本 #7 及本地备份；测试环境 CI #17/#18 的脚本 #11 保留。
+- 删除入口废弃的 BUILD_PUSH 变量；打包入口始终委托项目脚本执行完整打包。
+- 当前项目脚本仍使用 buildx，原生 Docker 模式尚需在项目脚本中实现；后端 package-linux-prod.sh 的 sed 写法也需兼容 Linux。

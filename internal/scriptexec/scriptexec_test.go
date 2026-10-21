@@ -78,3 +78,43 @@ npm install
 		}
 	}
 }
+
+func TestExecWithOptionsMergesOutputBeforeReturning(t *testing.T) {
+	var lines []string
+	result, err := ExecWithOptions(context.Background(), `for i in {1..200}; do
+ echo "out-$i"
+ echo "err-$i" >&2
+done
+printf tail >&2
+`, t.TempDir(), ExecOptions{}, func(format string, args ...any) {
+		lines = append(lines, fmt.Sprintf(format, args...))
+	})
+	if err != nil || result.Status != "success" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if len(lines) != 401 {
+		t.Fatalf("got %d lines", len(lines))
+	}
+	for i := 1; i <= 200; i++ {
+		if lines[(i-1)*2] != fmt.Sprintf("out-%d", i) || lines[(i-1)*2+1] != fmt.Sprintf("err-%d", i) {
+			t.Fatalf("wrong output order at %d", i)
+		}
+	}
+	if lines[400] != "tail" {
+		t.Fatalf("lost final stderr: %q", lines[400])
+	}
+}
+
+func TestExecWithOptionsPreservesLongLogLine(t *testing.T) {
+	want := strings.Repeat("x", 128*1024)
+	var lines []string
+	result, err := ExecWithOptions(context.Background(), "printf '%s\\n' '"+want+"' >&2\nprintf done\n", t.TempDir(), ExecOptions{}, func(format string, args ...any) {
+		lines = append(lines, fmt.Sprintf(format, args...))
+	})
+	if err != nil || result.Status != "success" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if len(lines) != 2 || lines[0] != want || lines[1] != "done" {
+		t.Fatalf("long log truncated or trailing output lost (lines=%d)", len(lines))
+	}
+}

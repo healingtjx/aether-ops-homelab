@@ -3,6 +3,7 @@ package scriptexec
 import (
 	"bufio"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,31 +86,37 @@ func ExecWithOptions(ctx context.Context, scriptContent string, workDir string, 
 	cmd.Dir = workDir
 	cmd.Env = env
 
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return ExecResult{Status: "failed", Message: "创建日志管道失败: " + err.Error()}, nil
+	}
+	// 合并输出到同一管道，日志回调仅由当前协程调用，避免并发写入 SSE 响应。
+	cmd.Stderr = cmd.Stdout
 
 	if err := cmd.Start(); err != nil {
 		return ExecResult{Status: "failed", Message: "启动脚本失败: " + err.Error()}, nil
 	}
 
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if log != nil {
-				log("%s", line)
-			}
+	reader := bufio.NewReader(stdout)
+	var readErr error
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 && log != nil {
+			log("%s", strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"))
 		}
-	}()
-
-	for scanner := bufio.NewScanner(stdout); scanner.Scan(); {
-		line := scanner.Text()
-		if log != nil {
-			log("%s", line)
+		if err != nil {
+			if err != io.EOF {
+				readErr = err
+				cancel()
+			}
+			break
 		}
 	}
 
 	err = cmd.Wait()
+	if readErr != nil {
+		return ExecResult{Status: "failed", Message: "读取脚本日志失败: " + readErr.Error()}, nil
+	}
 	if err != nil {
 		if execCtx.Err() == context.DeadlineExceeded {
 			return ExecResult{Status: "failed", Message: "脚本执行超时"}, nil
