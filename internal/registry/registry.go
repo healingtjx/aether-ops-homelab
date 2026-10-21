@@ -198,6 +198,9 @@ func (c *Client) listRepositoryImagesBestEffort(ctx context.Context, repos []str
 }
 
 func (c *Client) DeleteManifest(ctx context.Context, repository string, digest string, tag string) error {
+	if c.provider == "aws_ecr" {
+		return c.deleteECRTag(ctx, repository, tag)
+	}
 	if c.provider == "aliyun_acr" {
 		region := aliyun.ExtractRegion(c.baseURL)
 		if region == "" {

@@ -359,9 +359,9 @@ func (h *ArtifactHandler) DeleteRemoteArtifact(w http.ResponseWriter, r *http.Re
 		http.Error(w, "产物已删除", http.StatusUnprocessableEntity)
 		return
 	}
-	if artifact.Digest == nil || strings.TrimSpace(*artifact.Digest) == "" {
-		http.Error(w, "缺少 digest，无法删除远端 manifest", http.StatusUnprocessableEntity)
-		return
+	digest := ""
+	if artifact.Digest != nil {
+		digest = *artifact.Digest
 	}
 
 	reg, err := models.GetArtifactRegistry(ctx, h.db, artifact.RegistryID)
@@ -377,7 +377,7 @@ func (h *ArtifactHandler) DeleteRemoteArtifact(w http.ResponseWriter, r *http.Re
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	if err := client.DeleteManifest(ctx, artifact.Repository, *artifact.Digest, artifact.Tag); err != nil {
+	if err := client.DeleteManifest(ctx, artifact.Repository, digest, artifact.Tag); err != nil {
 		models.UpdateArtifactOperationLogStatus(ctx, h.db, opLog.ID, "failed", err.Error())
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

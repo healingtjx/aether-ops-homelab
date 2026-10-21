@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,11 +23,18 @@ const (
 
 func Start(pool *pgxpool.Pool) *cron.Cron {
 	c := cron.New()
-	_, err := c.AddFunc(artifactCleanupCron, func() {
+	var cleanupMu sync.Mutex
+	run := func() {
+		if !cleanupMu.TryLock() {
+			log.Printf("artifact cleanup: skip (already running)")
+			return
+		}
+		defer cleanupMu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), artifactCleanupTimeout)
 		defer cancel()
 		runArtifactCleanup(ctx, pool)
-	})
+	}
+	_, err := c.AddFunc(artifactCleanupCron, run)
 	if err != nil {
 		log.Printf("scheduler: register artifact cleanup failed: %v", err)
 		return c
@@ -85,7 +92,11 @@ func cleanupRegistry(ctx context.Context, db *pgxpool.Pool, reg models.ArtifactR
 	// 同步远端镜像到 DB，确保数据最新
 	var images []registry.Image
 	if len(reg.RepositoryList()) > 0 {
-		result, _ := client.ListRepositoryImagesResult(ctx, reg.RepositoryList())
+		var result registry.ListResult
+		result, err = client.ListRepositoryImagesResult(ctx, reg.RepositoryList())
+		if err == nil && len(result.Errors) > 0 {
+			err = fmt.Errorf("仓库 %s 同步失败: %w", result.Errors[0].Repository, result.Errors[0].Err)
+		}
 		images = result.Images
 	} else {
 		images, err = client.ListImages(ctx)
@@ -133,13 +144,12 @@ func cleanupRegistry(ctx context.Context, db *pgxpool.Pool, reg models.ArtifactR
 			victims[i], victims[j] = victims[j], victims[i]
 		}
 		for _, victim := range victims {
-			if victim.Digest == nil || strings.TrimSpace(*victim.Digest) == "" {
-				log.Printf("artifact cleanup: skip %s:%s (missing digest)", repo, victim.Tag)
-				failed++
-				continue
+			digest := ""
+			if victim.Digest != nil {
+				digest = *victim.Digest
 			}
 			time.Sleep(2 * time.Second)
-			if err := client.DeleteManifest(ctx, victim.Repository, *victim.Digest, victim.Tag); err != nil {
+			if err := client.DeleteManifest(ctx, victim.Repository, digest, victim.Tag); err != nil {
 				log.Printf("artifact cleanup: delete %s:%s remote failed: %v", repo, victim.Tag, err)
 				failed++
 				continue
@@ -157,6 +167,7 @@ func cleanupRegistry(ctx context.Context, db *pgxpool.Pool, reg models.ArtifactR
 	msg := fmt.Sprintf("清理完成，删除 %d 个 tag", deleted)
 	status := "success"
 	if failed > 0 {
+		status = "failed"
 		msg = fmt.Sprintf("%s，失败 %d 个", msg, failed)
 	}
 	finish(status, msg)
