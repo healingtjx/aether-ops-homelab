@@ -1,0 +1,48 @@
+探聊管理端 Linux 直接部署
+
+项目：tanliao
+应用：tanliao-admin
+Git：https://github.com/healingtjx/tanliao-admin.git
+分支：master
+服务器：192.168.5.4，SSH 用户 tjx，端口 22。
+
+CI 配置：
+- 后端 tio-mg-all：编译 parent、all，上传 lib 和 config 到 /opt/tanliao/admin/java。
+  使用 Java 8，以 org.tio.mg.all.Starter 为主类启动，API 端口 21006。
+  启动命令：
+  java -Xverify:none -Xms64m -Xmx2046m -cp "/opt/tanliao/admin/java/config:/opt/tanliao/admin/java/lib/*" org.tio.mg.all.Starter
+  该项目不是单个可执行胖 JAR，依赖 JAR 和配置必须同时部署。
+  采用仓库 dev 配置，仅将产物中的 http.api.port 改为 21006；不做 Docker 主机替换。
+
+- 前端 pc-html：npm 构建，覆盖 /opt/tanliao/admin/html。
+  启动命令：
+  python3 /opt/tanliao/admin/run/http_server.py --port 21007 --directory /opt/tanliao/admin/html
+  页面地址：http://192.168.5.4:21007
+  编译变量 VUE_APP_apiCtx=/tioadmin。
+  API_BASE_URL 固定为 /tioadmin；Python 同源转发到 127.0.0.1:21006。
+  不需要 Nginx，不跨域直连后端。已验证页面显示登录表单，未执行账号登录。
+
+操作：
+- 在 CI 配置中选择模块并执行，自动拉取、编译、上传、停止该模块旧进程、启动。
+- CI 不需要 IMAGE_TAG、AWS、Docker 或 Nginx。
+- 日志：/opt/tanliao/admin/logs/java.log、html.log。
+- PID：/opt/tanliao/admin/run/java.pid、html.pid。
+- 启动检查确认对应进程监听端口，不代表业务接口全部可用。
+- 首次部署需要 SSH 用户能创建/写入 /opt/tanliao/admin。
+- 目标服务器需要 Java 8（后端）、Python 3（前端）、flock、ss、sha256sum、tar。
+- 执行机需要 Java 8、平台 Maven 私服配置、Node/npm、SSH/scp；密码认证使用 sshpass。
+- 沿用平台已保存的服务器凭据，执行账户需信任 SSH 主机密钥。
+- 进程通过 nohup 启动；未配置机器重启后的自动启动。
+- 单独的 ECR 镜像打包配置仍保留，只用于手动打包，不属于 Linux CI 部署链路。
+
+脚本备份：
+- doc/scripts/tanliao/tanliao-admin-测试环境部署.sh
+- doc/scripts/tanliao/tanliao-admin-ECR镜像打包.sh
+- doc/scripts/tanliao/tanliao-admin-编译.sh
+- 备份正文从数据库 release_scripts 导出，与数据库内容一致。
+- Python HTTP 服务代码已内嵌在 Linux 直接部署脚本中。
+- 以数据库配置为准；平台调整脚本后重新导出到对应项目目录。
+- 本地文件仅为备份，不会自动回写数据库。
+
+已完成平台配置更新、脚本模拟验证和 Python 转发测试。
+白屏修复已应用到服务器，并重启前端 Python 服务；登录页已在浏览器验证。

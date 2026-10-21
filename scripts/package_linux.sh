@@ -32,7 +32,7 @@ cp scripts/install_server.sh "${WORK_DIR}/install_server.sh"
 chmod +x "${WORK_DIR}/start_server.sh"
 chmod +x "${WORK_DIR}/install_server.sh"
 if [ -d doc/scripts ]; then
-	cp doc/scripts/* "${WORK_DIR}/doc/scripts/" 2>/dev/null || true
+	cp -R doc/scripts/. "${WORK_DIR}/doc/scripts/"
 fi
 
 cat >"${WORK_DIR}/config.yaml.example" <<'YAML'
