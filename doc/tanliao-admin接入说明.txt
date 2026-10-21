@@ -65,3 +65,32 @@ CI 配置：
 - 删除无配置引用的旧编译脚本 #7 及本地备份；测试环境 CI #17/#18 的脚本 #11 保留。
 - 删除入口废弃的 BUILD_PUSH 变量；打包入口始终委托项目脚本执行完整打包。
 - 当前项目脚本仍使用 buildx，原生 Docker 模式尚需在项目脚本中实现；后端 package-linux-prod.sh 的 sed 写法也需兼容 Linux。
+
+2026-10-21：产物发布接入（SSH 凭据待填写）
+- 发布服务器：160.191.53.106；预留用户 root、端口 22，请按实际 SSH 配置调整。
+- 远端目录：/opt/tanliao-admin；Compose 文件：docker-compose.yaml。
+- 后端：CI #17 → ECR tio-mg-all → Compose service tio-mg-all。
+- 前端：CI #18 → ECR tio-mg-pc-html → Compose service pc-html。
+- 两条发布映射已创建，暂不启用；未连接该服务器、未执行实际发布。
+- 在“CI 配置”编辑 #17 和 #18 的变量，分别配置：
+  DEPLOY_SSH_HOST=160.191.53.106
+  DEPLOY_SSH_USER=root
+  DEPLOY_SSH_PORT=22
+  DEPLOY_SSH_KEY_PATH=<平台服务器上的私钥绝对路径>
+  或填写 DEPLOY_SSH_PASSWORD / DEPLOY_SSH_PRIVATE_KEY；密钥有口令时填写 DEPLOY_SSH_PASSPHRASE。
+- DEPLOY_SSH_* 仅供产物发布使用；已有 REMOTE_* 仍供测试环境脚本使用。
+- 显式指定发布 SSH 配置后，平台不会回退使用其他服务器的全局凭据。
+- 完成凭据配置后，在“产物发布”编辑对应映射并勾选启用，选择版本发布。
+- 每次 ECR 发布都由平台服务器执行 aws ecr get-login-password --region ap-northeast-1，
+  再通过 SSH 将令牌送入目标服务器 docker login --username AWS --password-stdin。
+  使用平台进程的 AWS 身份（支持 AWS_PROFILE）；目标服务器无需安装 AWS CLI。
+  临时令牌不保存到数据库或发布日志；登录失败立即终止发布。
+- 数据库配置备份：doc/sql/docker_deploy_mapping_tanliao_admin.sql。
+
+2026-10-22：SSH 密钥配置完成
+- 平台专用私钥：/opt/aether/keys/tanliao_deploy_ed25519（192.168.5.4 平台服务器）。
+- 公钥已由用户添加到 160.191.53.106 的 /root/.ssh/authorized_keys。
+- 已验证平台通过 root:22 密钥登录，Docker Compose v2.35.1 可用，两个服务名均匹配。
+- 已验证平台 AWS CLI 获取令牌并在目标服务器 Docker 登录 ECR 成功。
+- CI #17/#18 已保存独立密钥路径；产物发布映射 #6/#7 已启用。
+- 验证未执行镜像拉取或容器重启；当前后端版本 26.0519.0、前端版本 26.1018.0。

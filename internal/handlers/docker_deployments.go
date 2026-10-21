@@ -377,7 +377,11 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 	}
 
 	models.UpdateDockerDeployStatus(context.Background(), h.db, id, "running", "")
-	sshConfig, err := dockerdeploy.LoadSSHConfigFromEnv()
+	ciConfig, err := models.GetCIConfig(r.Context(), h.db, mapping.CIConfigID)
+	var sshConfig dockerdeploy.SSHConfig
+	if err == nil {
+		sshConfig, err = dockerdeploy.LoadSSHConfigForDeployment(ciConfig.Variables)
+	}
 	if err != nil {
 		msg := err.Error()
 		models.UpdateOperationLogStatus(context.Background(), h.db, opLog.ID, "failed", msg)
@@ -388,7 +392,7 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	deployCtx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	deployCtx, cancel := context.WithTimeout(context.Background(), 31*time.Minute)
 	defer cancel()
 	logFn := func(format string, args ...any) {
 		sendLog(fmt.Sprintf(format, args...))
@@ -400,6 +404,7 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		ComposeFile:        mapping.ComposeFile,
 		ServiceName:        mapping.ComposeServiceName,
 		ImageRef:           imageRef,
+		RegistryProvider:   registry.Provider,
 		RegistryHost:       mapping.RegistryHost(),
 		RegistryUsername:   registry.Username,
 		RegistryCredential: registry.Credential,

@@ -83,11 +83,16 @@ func (c *Client) deleteECRTag(ctx context.Context, repository, tag string) error
 }
 
 func ecrLoginPassword(host string) (string, error) {
+	return ECRLoginPassword(context.Background(), host)
+}
+
+// ECRLoginPassword fetches a fresh token using the platform AWS identity.
+func ECRLoginPassword(ctx context.Context, host string) (string, error) {
 	match := ecrHostPattern.FindStringSubmatch(host)
 	if match == nil {
 		return "", fmt.Errorf("ECR 地址必须为私有仓库标准域名")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	output, err := exec.CommandContext(ctx, "aws", "ecr", "get-login-password", "--region", match[1]).Output()
 	if err != nil {

@@ -1,6 +1,7 @@
 package dockerdeploy
 
 import (
+	"aether_ops/internal/registry"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -34,6 +35,7 @@ type Options struct {
 	ComposeFile        string
 	ServiceName        string
 	ImageRef           string
+	RegistryProvider   string
 	RegistryHost       string
 	RegistryUsername   string
 	RegistryCredential string
@@ -55,7 +57,7 @@ type remoteStep struct {
 	Commands []string `json:"commands"`
 }
 
-const deployTimeout = 5 * time.Minute
+const deployTimeout = 30 * time.Minute
 
 func LoadSSHConfigFromEnv() (SSHConfig, error) {
 	values := loadDotEnvValues()
@@ -173,12 +175,7 @@ func Deploy(ctx context.Context, opts Options, log LogFunc) (Result, error) {
 		"docker compose -f " + shellQuote(opts.ComposeFile) + " up -d " + shellQuote(opts.ServiceName),
 	}, " && ")
 	logf(log, "执行远端发布: docker compose up -d %s", opts.ServiceName)
-	output, err := runSSH(execCtx, client, cmd, nil)
-	if len(strings.TrimSpace(string(output))) > 0 {
-		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-			logf(log, "%s", line)
-		}
-	}
+	err = runSSHStreaming(execCtx, client, cmd, log)
 	if err != nil {
 		return Result{Status: "failed", Message: "执行 docker compose 失败: " + err.Error()}, nil
 	}
@@ -241,12 +238,7 @@ func runRemoteSteps(ctx context.Context, client *ssh.Client, steps remoteStepsFi
 		if len(commands) == 0 {
 			continue
 		}
-		output, err := runSSH(ctx, client, strings.Join(commands, " && "), nil)
-		if len(strings.TrimSpace(string(output))) > 0 {
-			for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-				logf(log, "%s", line)
-			}
-		}
+		err := runSSHStreaming(ctx, client, strings.Join(commands, " && "), log)
 		if err != nil {
 			if strings.TrimSpace(step.Name) != "" {
 				return fmt.Errorf("执行远端步骤 %s 失败: %w", step.Name, err)
@@ -267,6 +259,14 @@ func expandRemoteCommand(command string, vars map[string]string) string {
 }
 
 func dockerLogin(ctx context.Context, client *ssh.Client, opts Options, log LogFunc) error {
+	if opts.RegistryProvider == "aws_ecr" {
+		logf(log, "通过 AWS CLI 获取本次发布的 ECR 登录凭据")
+		password, err := registry.ECRLoginPassword(ctx, opts.RegistryHost)
+		if err != nil {
+			return err
+		}
+		opts.RegistryUsername, opts.RegistryCredential = "AWS", password
+	}
 	if opts.RegistryHost == "" || opts.RegistryUsername == "" || opts.RegistryCredential == "" {
 		return nil
 	}
