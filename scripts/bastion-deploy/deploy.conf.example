@@ -1,0 +1,42 @@
+# 可信 Bash 配置，需要 Bash 4+。键：项目/环境/服务。
+# SSH_KEY 位于跳板机；DEPLOY_DIR 和 AWS_PROFILE 位于目标服务器。
+declare -A SSH_HOST SSH_PORT SSH_USER SSH_KEY
+declare -A DEPLOY_DIR COMPOSE_FILE COMPOSE_SERVICE
+declare -A IMAGE_REPOSITORY AWS_REGION AWS_PROFILE
+
+key="tanliao/prod/tio-mg-all"
+SSH_HOST[$key]="160.191.53.106"
+SSH_PORT[$key]="22"
+SSH_USER[$key]="root"
+SSH_KEY[$key]="/opt/bastion-deploy/keys/tanliao_ed25519"
+DEPLOY_DIR[$key]="/opt/tanliao-admin"
+COMPOSE_FILE[$key]="docker-compose.yaml"
+COMPOSE_SERVICE[$key]="tio-mg-all"
+IMAGE_REPOSITORY[$key]="319966842764.dkr.ecr.ap-northeast-1.amazonaws.com/tio-mg-all"
+AWS_REGION[$key]="ap-northeast-1"
+AWS_PROFILE[$key]=""
+
+key="tanliao/prod/pc-html"
+SSH_HOST[$key]="160.191.53.106"
+SSH_PORT[$key]="22"
+SSH_USER[$key]="root"
+SSH_KEY[$key]="/opt/bastion-deploy/keys/tanliao_ed25519"
+DEPLOY_DIR[$key]="/opt/tanliao-admin"
+COMPOSE_FILE[$key]="docker-compose.yaml"
+COMPOSE_SERVICE[$key]="pc-html"
+IMAGE_REPOSITORY[$key]="319966842764.dkr.ecr.ap-northeast-1.amazonaws.com/tio-mg-pc-html"
+AWS_REGION[$key]="ap-northeast-1"
+AWS_PROFILE[$key]=""
+
+# 另一项目的占位示例，使用前替换为真实信息。
+key="another-project/prod/api"
+SSH_HOST[$key]="192.168.10.20"
+SSH_PORT[$key]="22"
+SSH_USER[$key]="deploy"
+SSH_KEY[$key]="/opt/bastion-deploy/keys/another_ed25519"
+DEPLOY_DIR[$key]="/opt/another-project"
+COMPOSE_FILE[$key]="docker-compose.yml"
+COMPOSE_SERVICE[$key]="api"
+IMAGE_REPOSITORY[$key]="123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/another-api"
+AWS_REGION[$key]="ap-northeast-1"
+AWS_PROFILE[$key]=""
