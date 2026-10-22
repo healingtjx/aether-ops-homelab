@@ -33,7 +33,7 @@
             if(event.detail.successful) {
               window.location.reload();
             }">
-        {{template "docker_deployment_fields" dict "CIConfigs" .CIConfigs "Registries" .Registries "Repositories" .Repositories}}
+        {{template "docker_deployment_fields" dict "CIConfigs" .CIConfigs "Registries" .Registries "Repositories" .Repositories "Scripts" .Scripts}}
         <div id="modal-error"></div>
         <div class="modal-actions">
             <button type="button" onclick="closeModal()">取消</button>
@@ -41,6 +41,7 @@
         </div>
     </form>
 </template>
+{{template "deploy_settings_js"}}
 </body>
 </html>
 {{end}}

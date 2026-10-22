@@ -30,6 +30,10 @@ type SSHConfig struct {
 }
 
 type Options struct {
+	ScriptID           string
+	ScriptsDir         string
+	ScriptParams       map[string]string
+	ImageTag           string
 	SSH                SSHConfig
 	RemoteDir          string
 	ComposeFile        string
@@ -119,10 +123,23 @@ func Deploy(ctx context.Context, opts Options, log LogFunc) (Result, error) {
 	if opts.ComposeFile == "" {
 		opts.ComposeFile = "docker-compose.yml"
 	}
-	if opts.RemoteDir == "" || opts.ServiceName == "" || opts.ImageRef == "" {
+	if (opts.ScriptID == "" && opts.RemoteDir == "") || opts.ServiceName == "" || opts.ImageRef == "" {
 		return Result{Status: "failed", Message: "远端目录、service 名和镜像不能为空"}, nil
 	}
 
+	var selected *Script
+	var compiled []remoteStep
+	if opts.ScriptID != "" {
+		script, err := LoadScript(opts.ScriptsDir, opts.ScriptID)
+		if err != nil {
+			return Result{Status: "failed", Message: err.Error()}, nil
+		}
+		compiled, err = script.compile(opts.ScriptParams, opts)
+		if err != nil {
+			return Result{Status: "failed", Message: err.Error()}, nil
+		}
+		selected = &script
+	}
 	execCtx, cancel := context.WithTimeout(ctx, deployTimeout)
 	defer cancel()
 
@@ -132,8 +149,23 @@ func Deploy(ctx context.Context, opts Options, log LogFunc) (Result, error) {
 	}
 	defer client.Close()
 
-	if err := dockerLogin(execCtx, client, opts, log); err != nil {
-		return Result{Status: "failed", Message: err.Error()}, nil
+	if selected == nil || selected.login() {
+		if err := dockerLogin(execCtx, client, opts, log); err != nil {
+			return Result{Status: "failed", Message: err.Error()}, nil
+		}
+	}
+	if selected != nil {
+		logf(log, "发布脚本: %s (%s)，SSH 目标: %s@%s:%d", selected.Name, opts.ScriptID, opts.SSH.User, opts.SSH.Host, opts.SSH.Port)
+		for _, step := range compiled {
+			if len(step.Commands) == 0 {
+				continue
+			}
+			logf(log, "==> %s", step.Name)
+			if err := runSSHStreaming(execCtx, client, strings.Join(step.Commands, " && "), log); err != nil {
+				return Result{Status: "failed", Message: fmt.Sprintf("执行步骤 %s 失败: %v", step.Name, err)}, nil
+			}
+		}
+		return Result{Status: "success", Message: "远端步骤执行成功"}, nil
 	}
 
 	steps, stepsPath, hasSteps, err := loadRemoteStepsFile()

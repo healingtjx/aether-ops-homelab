@@ -80,7 +80,7 @@ func main() {
 		handlers.NewCIConfigHandler(pool, renderer, cfg.WorkDir.CIPath).Register(r)
 		handlers.NewArtifactHandler(pool, renderer).Register(r)
 		handlers.NewArtifactBuildHandler(pool, renderer, cfg.WorkDir.CIPath).Register(r)
-		handlers.NewDockerDeploymentHandler(pool, renderer).Register(r)
+		handlers.NewDockerDeploymentHandler(pool, renderer, cfg.Deploy.ScriptsDir).Register(r)
 		handlers.NewGlobalConfigHandler(pool, renderer).Register(r)
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {

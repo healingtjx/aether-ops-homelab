@@ -1,0 +1,49 @@
+{{define "deploy_settings_js"}}
+<script>
+function updateDeploySSH(el) {
+ const root=el.closest('[data-deploy-settings]');
+ const independent=root.querySelector('[name=ssh_mode]').value==='independent';
+ const fields=root.querySelector('[data-ssh-fields]'); fields.hidden=!independent; fields.disabled=!independent;
+ const key=root.querySelector('[name=ssh_auth]').value==='key';
+ root.querySelector('[data-ssh-password]').hidden=key;
+ root.querySelector('[name=ssh_password]').disabled=key;
+ root.querySelector('[data-ssh-key]').hidden=!key;
+ root.querySelector('[name=ssh_key_path]').disabled=!key;
+ root.querySelector('[name=ssh_key_path]').required=key;
+ root.querySelector('[name=ssh_passphrase]').disabled=!key;
+}
+function updateDeployScript(el, initial) {
+ const root=el.closest('[data-deploy-settings]');
+ root.paramCache=root.paramCache||{};
+ const previous=root.dataset.activeScript;
+ if (previous!==undefined) {
+  const values={}; root.querySelectorAll('[data-param-row]').forEach(row=>{values[row.querySelector('[name=script_param_key]').value]=row.querySelector('[name=script_param_value]').value});
+  root.paramCache[previous]=values;
+ }
+ const definition=JSON.parse(el.selectedOptions[0]?.dataset.script||'{}');
+ const saved=initial ? JSON.parse(root.dataset.params||'{}')||{} : root.paramCache[el.value]||{};
+ const values=Object.assign({},definition.defaults||{},saved);
+ const system=new Set(['IMAGE_REF','IMAGE_TAG','SERVICE_NAME','REMOTE_DIR','COMPOSE_FILE','REGISTRY_HOST','REGISTRY_USER']);
+ const required=new Set(definition.required_vars||[]);
+ required.forEach(key=>{if(!system.has(key)&&!(key in values)) values[key]=''});
+ const container=root.querySelector('[data-script-params]'); container.replaceChildren();
+ if(el.value) Object.keys(values).sort().forEach(key=>{
+  const row=document.createElement('div'); row.className='field'; row.dataset.paramRow='';
+  const label=document.createElement('label');label.textContent=key+(required.has(key)?' *':'');
+  const name=document.createElement('input');name.type='hidden';name.name='script_param_key';name.value=key;
+  const value=document.createElement('input');value.name='script_param_value';value.value=values[key];value.required=required.has(key);
+  row.append(label,name,value);container.append(row);
+ });
+ root.dataset.activeScript=el.value;
+ const form=el.closest('form');
+ ['remote_dir','compose_file'].forEach(name=>{const field=form.querySelector('[name='+name+']');if(field) field.required=!el.value||required.has(name.toUpperCase())});
+}
+function initializeDeploySettings() {
+ document.querySelectorAll('[data-deploy-settings]:not([data-ready])').forEach(root=>{
+  root.dataset.ready='true';updateDeploySSH(root.querySelector('[name=ssh_mode]'));updateDeployScript(root.querySelector('[name=script_id]'),true);
+ });
+}
+initializeDeploySettings();
+new MutationObserver(initializeDeploySettings).observe(document.body,{childList:true,subtree:true});
+</script>
+{{end}}

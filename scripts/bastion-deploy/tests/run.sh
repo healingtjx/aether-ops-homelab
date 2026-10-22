@@ -121,6 +121,14 @@ expect_failure --tag '$(touch injected)'
 expect_failure --project missing
 [[ ! -s $work/ssh.args ]]
 echo 'PASS 非法参数和缺失配置在 SSH 前终止'
+reset_case
+expect_failure --expected-image wrong/repository:v2
+[[ ! -s $work/ssh.args ]]
+cmp "$compose" "$work/original"
+invoke --expected-image 319966842764.dkr.ecr.ap-northeast-1.amazonaws.com/tio-mg-pc-html:v2
+cmp "$compose" "$work/expected"
+echo 'PASS 所选产物与跳板机镜像一致性校验'
+
 
 for fixture in missing duplicate inline inherited alias variable multiline tabs; do
   reset_case

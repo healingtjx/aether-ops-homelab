@@ -83,6 +83,17 @@ if [ -f "${LOCAL_REMOTE_STEPS}" ]; then
 	"${SCP_CMD[@]}" "${LOCAL_REMOTE_STEPS}" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_STEPS}"
 fi
 
+# 自定义发布脚本目录；仅上传仓库中的模板，不覆盖映射配置或认证信息。
+LOCAL_DEPLOY_SCRIPTS="${LOCAL_DEPLOY_SCRIPTS:-${ROOT_DIR}/devops/deploy-scripts}"
+REMOTE_DEPLOY_SCRIPTS="${REMOTE_DEPLOY_SCRIPTS:-${REMOTE_DIR}/deploy-scripts}"
+if [ -d "${LOCAL_DEPLOY_SCRIPTS}" ]; then
+ "${SSH_CMD[@]}" "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p '${REMOTE_DEPLOY_SCRIPTS}'"
+ for script_file in "${LOCAL_DEPLOY_SCRIPTS}"/*.json; do
+  [ -f "${script_file}" ] || continue
+  "${SCP_CMD[@]}" "${script_file}" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DEPLOY_SCRIPTS}/"
+ done
+fi
+
 echo "==> 上传完成"
 echo "远端程序: ${REMOTE_BIN}"
 echo "远端步骤配置: ${REMOTE_STEPS}"

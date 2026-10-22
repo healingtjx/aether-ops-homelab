@@ -1,0 +1,15 @@
+server:
+  port: "8080"
+  login_path: /bs
+database:
+  host: localhost
+  port: "5432"
+  user: aether
+  password: CHANGE_ME
+  dbname: aether_ops
+  sslmode: disable
+  max_conns: 20
+deploy:
+  # 相对于 Ops 工作目录；生产可设置 /opt/aether/deploy-scripts。
+  # 本地使用仓库自带示例时改为 devops/deploy-scripts。
+  scripts_dir: deploy-scripts

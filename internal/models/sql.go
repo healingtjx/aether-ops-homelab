@@ -428,6 +428,7 @@ const (
 	sqlListDockerDeployMappings = `
 SELECT dm.id, dm.ci_config_id, dm.registry_id, dm.repository,
        dm.compose_service_name, dm.remote_dir, dm.compose_file, dm.description, dm.enabled,
+       dm.script_id, dm.script_params, dm.ssh_mode, dm.deploy_ssh,
        dm.last_deploy_status, dm.last_deploy_message, dm.last_deployed_at,
        dm.created_at, dm.updated_at,
        cc.application_id, a.name AS application_name,
@@ -444,6 +445,7 @@ ORDER BY p.name, a.name, cc.module_name, dm.compose_service_name`
 	sqlGetDockerDeployMapping = `
 SELECT dm.id, dm.ci_config_id, dm.registry_id, dm.repository,
        dm.compose_service_name, dm.remote_dir, dm.compose_file, dm.description, dm.enabled,
+       dm.script_id, dm.script_params, dm.ssh_mode, dm.deploy_ssh,
        dm.last_deploy_status, dm.last_deploy_message, dm.last_deployed_at,
        dm.created_at, dm.updated_at,
        cc.application_id, a.name AS application_name,
@@ -460,9 +462,9 @@ WHERE dm.id = $1`
 	sqlCreateDockerDeployMapping = `
 INSERT INTO docker_deploy_mappings (
     ci_config_id, registry_id, repository, compose_service_name,
-    remote_dir, compose_file, description, enabled
+    remote_dir, compose_file, description, enabled, script_id, script_params, ssh_mode, deploy_ssh
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id`
 
 	sqlUpdateDockerDeployMapping = `
@@ -475,6 +477,7 @@ SET ci_config_id = $2,
     compose_file = $7,
     description = $8,
     enabled = $9,
+    script_id = $10, script_params = $11, ssh_mode = $12, deploy_ssh = $13,
     updated_at = NOW()
 WHERE id = $1`
 

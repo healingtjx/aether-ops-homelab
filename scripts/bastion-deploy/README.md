@@ -1,6 +1,6 @@
 # 跳板机产物发布
 
-调用方执行跳板机上的 `deploy.sh`，脚本通过 SSH 到目标服务器，重新登录 ECR、修改指定 Compose 服务的镜像并发布。当前不修改平台发布按钮或数据库。
+调用方执行跳板机上的 `deploy.sh`，脚本通过 SSH 到目标服务器，重新登录 ECR、修改指定 Compose 服务的镜像并发布。可手动调用，也可由 Ops 发布映射选择跳板机 JSON 调用。
 
 ## 安装与配置
 
@@ -53,15 +53,11 @@ ssh -T deploy@bastion.example.com \
 
 平台应采集标准输出、标准错误及退出码。镜像 tag 仅允许 Docker tag 字符，不接受任意命令。
 
-## Ops 脚本库接入
+## Ops 产物发布按钮接入
 
-Ops 调用入口保存在 `doc/scripts/common/通用-跳板机发布.sh`，数据库发布脚本为 `通用-跳板机发布`。它使用现有 CI 脚本执行流程，不需要更新 Ops 程序；现有“产物发布”按钮不读取此脚本，不能通过只新增脚本改变该按钮的行为。
+新版 Ops 在发布映射中选择 `bastion-deploy.json`，配置独立 SSH 和项目、环境参数即可使用本脚本。先执行数据库迁移并同步 Ops 程序、JSON 和新版 deploy.sh，具体见 [发布映射说明](../../doc/deploy-script-mappings.md)。仅更新本地代码不会改变线上按钮。
 
-在独立的 CI 配置中选择此脚本，设置 `DEPLOY_SERVICE=pc-html`（后端为 `tio-mg-all`）和 `IMAGE_TAG`。服务未显式填写时使用 CI 的 `MODULE_NAME`。不要替换原测试环境 CI 的脚本。
-
-跳板机默认地址为 `ubuntu@43.213.226.16:22`，项目 `tanliao`、环境 `prod`，脚本及配置均位于 `/opt/bastion-deploy/`。通过 `BASTION_HOST`、`BASTION_PORT`、`BASTION_USER`、`BASTION_SCRIPT`、`BASTION_CONFIG`、`DEPLOY_PROJECT` 和 `DEPLOY_ENV` 可以覆盖。
-
-认证二选一：`BASTION_PASSWORD` 为跳板机密码（Ops 需安装 sshpass），或 `BASTION_KEY_PATH` 为 **Ops 服务器本地**私钥路径。密码仅在系统中填写，不提交到仓库。提前以 Ops 运行用户建立跳板机 known_hosts。脚本传回远端输出及失败结果；不会构建镜像，也不自动选择最新版本。
+`--expected-image IMAGE` 为可选参数，平台调用时传入所选产物完整镜像地址；脚本核对配置生成的镜像一致后才连接目标服务器。原手动命令无需增加此参数。
 
 ## 修改范围与失败行为
 

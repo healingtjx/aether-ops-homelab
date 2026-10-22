@@ -2,7 +2,7 @@
 <tr id="docker-deployment-{{.ID}}">
     <td>
         <div class="ci-config-module-name">{{.ComposeServiceName}}</div>
-        <div class="ci-config-module-path">{{.ComposeFile}}</div>
+        <div class="ci-config-module-path">{{if .ScriptID}}{{.ScriptID}}{{else}}Docker Compose{{end}}</div>
     </td>
     <td>
         <div class="ci-config-module-name">{{.ProjectName}} / {{.ApplicationName}}</div>
@@ -49,6 +49,43 @@
 
 {{define "docker_deployment_fields"}}
 {{$mapping := .Mapping}}
+<div data-deploy-settings data-params="{{with $mapping}}{{.ScriptParamsJSON}}{{else}}{}{{end}}">
+ <div class="field">
+  <label>发布脚本</label>
+  <select name="script_id" onchange="updateDeployScript(this)">
+   <option value="">Docker Compose（默认）</option>
+   {{$selected := ""}}{{with $mapping}}{{$selected = .ScriptID}}{{end}}
+   {{$found := false}}
+   {{range .Scripts}}
+   {{if eq .ID $selected}}{{$found = true}}{{end}}
+   <option value="{{.ID}}" data-script="{{.JSON}}" {{if eq .ID $selected}}selected{{end}} {{if not .ID}}disabled{{end}}>{{.Name}}{{if .Error}}（不可用：{{.Error}}）{{end}}</option>
+   {{end}}
+   {{if and $selected (not $found)}}<option value="{{$selected}}" selected>{{$selected}}（文件缺失）</option>{{end}}
+  </select>
+ </div>
+ <div data-script-params></div>
+ <div class="field">
+  <label>SSH 连接</label>
+  <select name="ssh_mode" onchange="updateDeploySSH(this)">
+   <option value="inherit">继承 CI 配置</option>
+   <option value="independent" {{with $mapping}}{{if eq .SSHMode "independent"}}selected{{end}}{{end}}>独立配置</option>
+  </select>
+ </div>
+ <fieldset data-ssh-fields hidden disabled>
+  <div class="field-row">
+   <div class="field"><label>SSH 主机</label><input name="ssh_host" value="{{with $mapping}}{{index .DeploySSH "DEPLOY_SSH_HOST"}}{{end}}" required></div>
+   <div class="field"><label>端口</label><input name="ssh_port" type="number" min="1" max="65535" value="{{with $mapping}}{{with index .DeploySSH "DEPLOY_SSH_PORT"}}{{.}}{{else}}22{{end}}{{else}}22{{end}}" required></div>
+  </div>
+  <div class="field"><label>用户名</label><input name="ssh_user" value="{{with $mapping}}{{index .DeploySSH "DEPLOY_SSH_USER"}}{{end}}" required autocomplete="off"></div>
+  <div class="field"><label>认证方式</label><select name="ssh_auth" onchange="updateDeploySSH(this)"><option value="password">账户密码</option><option value="key" {{with $mapping}}{{if index .DeploySSH "DEPLOY_SSH_KEY_PATH"}}selected{{end}}{{end}}>私钥文件</option></select></div>
+  <div data-ssh-password class="field"><label>密码（留空保留已保存密码）</label><input name="ssh_password" type="password" autocomplete="new-password"></div>
+  <div data-ssh-key>
+   <div class="field"><label>Ops 上的私钥路径</label><input name="ssh_key_path" value="{{with $mapping}}{{index .DeploySSH "DEPLOY_SSH_KEY_PATH"}}{{end}}"></div>
+   <div class="field"><label>私钥口令（留空保留）</label><input name="ssh_passphrase" type="password" autocomplete="new-password"></div>
+  </div>
+ </fieldset>
+</div>
+
 <div class="field">
     <label>CI 配置</label>
     <select name="ci_config_id" required>
@@ -89,17 +126,17 @@
 </div>
 <div class="field-row">
     <div class="field">
-        <label>Compose service 名</label>
+        <label>服务名（SERVICE_NAME）</label>
         <input type="text" name="compose_service_name" value="{{with $mapping}}{{.ComposeServiceName}}{{end}}" placeholder="如 bmser-auth" required maxlength="255">
     </div>
     <div class="field">
         <label>Compose 文件</label>
-        <input type="text" name="compose_file" value="{{with $mapping}}{{.ComposeFile}}{{else}}docker-compose.yml{{end}}" required>
+        <input type="text" name="compose_file" value="{{with $mapping}}{{.ComposeFile}}{{else}}docker-compose.yml{{end}}">
     </div>
 </div>
 <div class="field">
     <label>远端目录</label>
-    <input type="text" name="remote_dir" value="{{with $mapping}}{{.RemoteDir}}{{end}}" placeholder="/opt/bmser" required>
+    <input type="text" name="remote_dir" value="{{with $mapping}}{{.RemoteDir}}{{end}}" placeholder="/opt/bmser">
 </div>
 <div class="field">
     <label>描述</label>
@@ -160,7 +197,7 @@
 <div class="modal-header"><h2>确认产物发布</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
 <form onsubmit="submitArtifactDeployRun(event, this, {{.Mapping.ID}})">
     <div class="field">
-        <label>CI 配置</label>
+        <label>发布脚本：{{if .Mapping.ScriptID}}{{.Mapping.ScriptID}}{{else}}Docker Compose{{end}}</label>
         <input type="text" value="{{.Mapping.ProjectName}} / {{.Mapping.ApplicationName}} / {{.Mapping.ModuleName}}" disabled>
     </div>
     <div class="field-row">

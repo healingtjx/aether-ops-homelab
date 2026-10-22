@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,9 +23,10 @@ import (
 )
 
 type DockerDeploymentHandler struct {
-	db       *pgxpool.Pool
-	rdr      *templates.Renderer
-	runStore *artifactDeployRunStore
+	scriptsDir string
+	db         *pgxpool.Pool
+	rdr        *templates.Renderer
+	runStore   *artifactDeployRunStore
 }
 
 type artifactDeployRun struct {
@@ -38,8 +40,8 @@ type artifactDeployRunStore struct {
 	runs map[string]artifactDeployRun
 }
 
-func NewDockerDeploymentHandler(db *pgxpool.Pool, rdr *templates.Renderer) *DockerDeploymentHandler {
-	return &DockerDeploymentHandler{db: db, rdr: rdr, runStore: newArtifactDeployRunStore()}
+func NewDockerDeploymentHandler(db *pgxpool.Pool, rdr *templates.Renderer, scriptsDir string) *DockerDeploymentHandler {
+	return &DockerDeploymentHandler{scriptsDir: scriptsDir, db: db, rdr: rdr, runStore: newArtifactDeployRunStore()}
 }
 
 func (h *DockerDeploymentHandler) Register(r chi.Router) {
@@ -122,6 +124,7 @@ func (h *DockerDeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 		"CIConfigs":    configs,
 		"Registries":   registries,
 		"Repositories": repositories,
+		"Scripts":      h.scriptOptions(),
 	})
 }
 
@@ -129,7 +132,7 @@ func (h *DockerDeploymentHandler) Create(w http.ResponseWriter, r *http.Request)
 	input, err := parseDockerDeployMappingForm(r)
 	if err != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte(`<span class="error">` + err.Error() + `</span>`))
+		w.Write([]byte(`<span class="error">` + html.EscapeString(err.Error()) + `</span>`))
 		return
 	}
 
@@ -137,13 +140,18 @@ func (h *DockerDeploymentHandler) Create(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 	if err := h.validateRepositorySelection(ctx, input.registryID, input.repository); err != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte(`<span class="error">` + err.Error() + `</span>`))
+		w.Write([]byte(`<span class="error">` + html.EscapeString(err.Error()) + `</span>`))
 		return
 	}
-	mapping, err := models.CreateDockerDeployMapping(ctx, h.db, input.ciConfigID, input.registryID, input.repository, input.serviceName, input.remoteDir, input.composeFile, input.description, input.enabled)
+	input.settings, err = h.parseDeploySettings(r, models.DockerDeployMapping{}, input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	mapping, err := models.CreateDockerDeployMapping(ctx, h.db, input.ciConfigID, input.registryID, input.repository, input.serviceName, input.remoteDir, input.composeFile, input.description, input.enabled, input.settings)
 	if err != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		w.Write([]byte(`<span class="error">` + err.Error() + `</span>`))
+		w.Write([]byte(`<span class="error">` + html.EscapeString(err.Error()) + `</span>`))
 		return
 	}
 	w.Header().Set("HX-Refresh", "true")
@@ -171,6 +179,7 @@ func (h *DockerDeploymentHandler) EditForm(w http.ResponseWriter, r *http.Reques
 		"CIConfigs":    configs,
 		"Registries":   registries,
 		"Repositories": repositories,
+		"Scripts":      h.scriptOptions(),
 	})
 }
 
@@ -192,7 +201,17 @@ func (h *DockerDeploymentHandler) Update(w http.ResponseWriter, r *http.Request)
 		h.renderDockerDeployEditError(w, r, id, err.Error())
 		return
 	}
-	mapping, err := models.UpdateDockerDeployMapping(ctx, h.db, id, input.ciConfigID, input.registryID, input.repository, input.serviceName, input.remoteDir, input.composeFile, input.description, input.enabled)
+	old, err := models.GetDockerDeployMapping(ctx, h.db, id)
+	if err != nil {
+		http.Error(w, "发布映射不存在", http.StatusNotFound)
+		return
+	}
+	input.settings, err = h.parseDeploySettings(r, old, input)
+	if err != nil {
+		h.renderDockerDeployEditError(w, r, id, err.Error())
+		return
+	}
+	mapping, err := models.UpdateDockerDeployMapping(ctx, h.db, id, input.ciConfigID, input.registryID, input.repository, input.serviceName, input.remoteDir, input.composeFile, input.description, input.enabled, input.settings)
 	if err != nil {
 		h.renderDockerDeployEditError(w, r, id, err.Error())
 		return
@@ -214,6 +233,7 @@ func (h *DockerDeploymentHandler) renderDockerDeployEditError(w http.ResponseWri
 		"CIConfigs":    configs,
 		"Registries":   registries,
 		"Repositories": repositories,
+		"Scripts":      h.scriptOptions(),
 		"Error":        message,
 	})
 }
@@ -380,7 +400,11 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 	ciConfig, err := models.GetCIConfig(r.Context(), h.db, mapping.CIConfigID)
 	var sshConfig dockerdeploy.SSHConfig
 	if err == nil {
-		sshConfig, err = dockerdeploy.LoadSSHConfigForDeployment(ciConfig.Variables)
+		values := ciConfig.Variables
+		if mapping.SSHMode == "independent" {
+			values = models.MergeVariables(models.Variables{"DEPLOY_SSH_HOST": ""}, mapping.DeploySSH)
+		}
+		sshConfig, err = dockerdeploy.LoadSSHConfigForDeployment(values)
 	}
 	if err != nil {
 		msg := err.Error()
@@ -399,6 +423,10 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 	}
 	sendLog(fmt.Sprintf("开始发布产物: %s", imageRef))
 	result, err := dockerdeploy.Deploy(deployCtx, dockerdeploy.Options{
+		ScriptID:           mapping.ScriptID,
+		ScriptsDir:         h.scriptsDir,
+		ScriptParams:       mapping.ScriptParams,
+		ImageTag:           artifact.Tag,
 		SSH:                sshConfig,
 		RemoteDir:          mapping.RemoteDir,
 		ComposeFile:        mapping.ComposeFile,
@@ -502,6 +530,7 @@ type dockerDeployMappingInput struct {
 	composeFile string
 	description *string
 	enabled     bool
+	settings    models.DockerDeploySettings
 }
 
 func parseDockerDeployMappingForm(r *http.Request) (dockerDeployMappingInput, error) {
@@ -522,7 +551,7 @@ func parseDockerDeployMappingForm(r *http.Request) (dockerDeployMappingInput, er
 		return dockerDeployMappingInput{}, fmt.Errorf("Compose service 名不能为空")
 	}
 	remoteDir := strings.TrimRight(strings.TrimSpace(r.FormValue("remote_dir")), "/")
-	if remoteDir == "" {
+	if remoteDir == "" && r.FormValue("script_id") == "" {
 		return dockerDeployMappingInput{}, fmt.Errorf("远端目录不能为空")
 	}
 	composeFile := strings.TrimSpace(r.FormValue("compose_file"))

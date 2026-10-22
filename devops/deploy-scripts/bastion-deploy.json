@@ -1,0 +1,19 @@
+{
+  "name": "通用跳板机发布",
+  "registry_login": false,
+  "defaults": {
+    "BASTION_SCRIPT": "/opt/bastion-deploy/deploy.sh",
+    "BASTION_CONFIG": "/opt/bastion-deploy/deploy.conf"
+  },
+  "required_vars": ["BASTION_SCRIPT", "BASTION_CONFIG", "DEPLOY_PROJECT", "DEPLOY_ENV", "SERVICE_NAME", "IMAGE_TAG", "IMAGE_REF"],
+  "before_upload": [],
+  "after_upload": [],
+  "restart": [
+    {
+      "name": "通过跳板机发布所选镜像",
+      "commands": [
+        "bash ${BASTION_SCRIPT} --config ${BASTION_CONFIG} --project ${DEPLOY_PROJECT} --env ${DEPLOY_ENV} --service ${SERVICE_NAME} --tag ${IMAGE_TAG} --expected-image ${IMAGE_REF}"
+      ]
+    }
+  ]
+}

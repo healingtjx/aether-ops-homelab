@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -10,7 +11,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type DockerDeploySettings struct {
+	ScriptID     string
+	ScriptParams Variables
+	SSHMode      string
+	DeploySSH    Variables
+}
+
 type DockerDeployMapping struct {
+	ScriptID           string
+	ScriptParams       Variables
+	SSHMode            string
+	DeploySSH          Variables
 	ID                 int64
 	CIConfigID         int64
 	RegistryID         int64
@@ -65,10 +77,10 @@ func GetDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, id int64) (Do
 	return pgx.CollectOneRow(rows, pgx.RowToStructByName[DockerDeployMapping])
 }
 
-func CreateDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, ciConfigID int64, registryID int64, repository string, serviceName string, remoteDir string, composeFile string, description *string, enabled bool) (DockerDeployMapping, error) {
+func CreateDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, ciConfigID int64, registryID int64, repository string, serviceName string, remoteDir string, composeFile string, description *string, enabled bool, settings DockerDeploySettings) (DockerDeployMapping, error) {
 	repository, serviceName, remoteDir, composeFile = normalizeDockerDeployMapping(repository, serviceName, remoteDir, composeFile)
 	var id int64
-	err := queryRow(ctx, db, sqlCreateDockerDeployMapping, ciConfigID, registryID, repository, serviceName, remoteDir, composeFile, description, enabled).Scan(&id)
+	err := queryRow(ctx, db, sqlCreateDockerDeployMapping, ciConfigID, registryID, repository, serviceName, remoteDir, composeFile, description, enabled, settings.ScriptID, settings.ScriptParams, settings.SSHMode, settings.DeploySSH).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
 			return DockerDeployMapping{}, fmt.Errorf("该发布映射已存在")
@@ -78,9 +90,9 @@ func CreateDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, ciConfigID
 	return GetDockerDeployMapping(ctx, db, id)
 }
 
-func UpdateDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, id int64, ciConfigID int64, registryID int64, repository string, serviceName string, remoteDir string, composeFile string, description *string, enabled bool) (DockerDeployMapping, error) {
+func UpdateDockerDeployMapping(ctx context.Context, db *pgxpool.Pool, id int64, ciConfigID int64, registryID int64, repository string, serviceName string, remoteDir string, composeFile string, description *string, enabled bool, settings DockerDeploySettings) (DockerDeployMapping, error) {
 	repository, serviceName, remoteDir, composeFile = normalizeDockerDeployMapping(repository, serviceName, remoteDir, composeFile)
-	_, err := execSQL(ctx, db, sqlUpdateDockerDeployMapping, id, ciConfigID, registryID, repository, serviceName, remoteDir, composeFile, description, enabled)
+	_, err := execSQL(ctx, db, sqlUpdateDockerDeployMapping, id, ciConfigID, registryID, repository, serviceName, remoteDir, composeFile, description, enabled, settings.ScriptID, settings.ScriptParams, settings.SSHMode, settings.DeploySSH)
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
 			return DockerDeployMapping{}, fmt.Errorf("该发布映射已存在")
@@ -175,4 +187,10 @@ func normalizeDockerDeployMapping(repository string, serviceName string, remoteD
 
 func normalizeRegistryHost(registryURL string) string {
 	return strings.TrimRight(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(registryURL), "https://"), "http://"), "/")
+}
+
+// ScriptParamsJSON never includes SSH credentials.
+func (m DockerDeployMapping) ScriptParamsJSON() string {
+	b, _ := json.Marshal(m.ScriptParams)
+	return string(b)
 }

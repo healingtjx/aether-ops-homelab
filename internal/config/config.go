@@ -8,7 +8,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type DeployConfig struct {
+	ScriptsDir string `yaml:"scripts_dir"`
+}
+
 type Config struct {
+	Deploy   DeployConfig   `yaml:"deploy"`
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	WorkDir  WorkDirConfig  `yaml:"work_dir"`
@@ -64,6 +69,7 @@ func Load() Config {
 
 func defaults() Config {
 	return Config{
+		Deploy: DeployConfig{ScriptsDir: "deploy-scripts"},
 		Server: ServerConfig{Port: "8080", LoginPath: "/bs"},
 		Database: DatabaseConfig{
 			Host:     "172.16.8.202",
@@ -90,6 +96,9 @@ func configPath() string {
 }
 
 func applyEnvOverrides(cfg *Config) {
+	if v := os.Getenv("AETHER_DEPLOY_SCRIPTS_DIR"); v != "" {
+		cfg.Deploy.ScriptsDir = v
+	}
 	if v := os.Getenv("PORT"); v != "" {
 		cfg.Server.Port = v
 	}

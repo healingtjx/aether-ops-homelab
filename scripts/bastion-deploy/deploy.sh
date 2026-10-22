@@ -3,11 +3,11 @@ set -euo pipefail
 
 fail() { printf '发布失败: %s\n' "$*" >&2; exit 1; }
 usage() {
-  echo '用法: bash deploy.sh --config FILE --project PROJECT --env ENV --service SERVICE --tag TAG'
+  echo '用法: bash deploy.sh --config FILE --project PROJECT --env ENV --service SERVICE --tag TAG [--expected-image IMAGE]'
 }
 if [[ ${1:-} == --help ]]; then usage; exit 0; fi
 (( BASH_VERSINFO[0] >= 4 )) || fail '跳板机需要 Bash 4 或更新版本'
-config='' project='' environment='' service='' tag=''
+config='' project='' environment='' service='' tag='' expected_image=''
 while (( $# )); do
   (( $# >= 2 )) || { usage >&2; exit 1; }
   case "$1" in
@@ -16,6 +16,7 @@ while (( $# )); do
     --env) environment=$2 ;;
     --service) service=$2 ;;
     --tag) tag=$2 ;;
+    --expected-image) expected_image=$2 ;;
     *) fail "未知参数: $1" ;;
   esac
   shift 2
@@ -47,6 +48,7 @@ region=${AWS_REGION[$key]:-}; profile=${AWS_PROFILE[$key]:-}
 [[ $repository =~ ^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/[a-z0-9][a-z0-9_./-]*$ ]] || fail '镜像仓库必须为完整的私有 ECR repository 地址'
 [[ $region =~ ^[a-z0-9-]+$ && $profile != *$'\n'* ]] || fail 'AWS 配置不合法'
 image_ref="$repository:$tag"
+[[ -z $expected_image || $expected_image == "$image_ref" ]] || fail "跳板机配置镜像与所选产物不一致: $image_ref"
 registry_host=${repository%%/*}
 image_filter=$(cat "$script_dir/replace-image.awk")
 printf '发布目标: %s (%s@%s:%s)\n服务: %s\n新镜像: %s\n' "$key" "$user" "$host" "$port" "$compose_service" "$image_ref"
