@@ -1,0 +1,107 @@
+tanliao-server 项目与镜像打包配置
+配置日期：2026-10-27
+
+已写入当前 Ops 平台数据库：
+- 项目：tanliao-server，ID 5。
+- 应用：tanliao-server，ID 5。
+- Git：https://github.com/healingtjx/tanliao-server.git
+- 分支：master；已只读验证远端分支可访问。
+- 本地参考代码：/Users/tjx/IdeaProjects/tanliao-server。
+- 发布脚本：tanliao-server-ECR镜像打包，ID 16。
+- 仓库：沿用 tanliao AWS ECR，ID 2。
+- Registry：319966842764.dkr.ecr.ap-northeast-1.amazonaws.com。
+
+镜像打包项：
+- #25：模块 tio-site-all，模块目录 all，镜像仓库 tio-site-all。
+- #26：模块 pc-html，模块目录 pc-html，镜像仓库 tio-site-pc-html。
+- 两条均为 artifact / docker 模式，分支 master。
+- IMAGE_REPOSITORY 已分别配置，用于产物同步和默认版本计算。
+- ECR 同步范围已追加两个 tio-site-* 仓库，保留原有 tio-mg-* 仓库。
+- 已配置镜像打包及测试环境 CI；没有创建产物发布映射。
+
+使用方式：
+1. 刷新平台，进入 tanliao-server 的镜像打包列表。
+2. 选择后端或前端，点击“打包”并输入版本号。
+3. 平台拉取 master，调用 bash devops/build_push_prod.sh <模块名> <版本号>。
+4. 项目脚本编译、构建 linux/amd64 镜像并推送 ECR，平台同步对应产物。
+
+构建环境与兼容处理：
+- 后端使用 Java 8，默认 JDK_HOME=/usr/lib/jvm/java-8-openjdk-amd64。
+- Maven settings 和缓存沿用平台全局工具配置，不另存私服凭据。
+- 前端 Node >= 17 时追加 --openssl-legacy-provider。
+- AWS_PROFILE 为空时移除该变量，沿用平台进程默认 AWS 身份。
+- 项目脚本使用 Docker Buildx；构建机需要可用的 AWS CLI、Docker/Buildx、Maven、Node 和前端包管理器。
+- 对应 ECR 仓库需存在，平台 AWS 身份需有镜像推送及基础镜像拉取权限。
+- 后端入口在平台工作副本中将 package-linux-prod.sh 的 sed -i .bak 改为 sed -i.bak，兼容 GNU/BSD sed。
+- 子打包脚本补充失败退出及 pipefail，主脚本也启用 pipefail，避免编译或 AWS 登录失败后继续推送。
+- 下一次平台拉取会重置工作副本；没有修改本地 tanliao-server 仓库。
+- 前端继续使用项目 .env.production 中的 API/WebSocket 地址，本次不改业务环境配置。
+
+源码说明：
+- 平台实际构建远端 master，不直接使用本机路径。
+- 配置时本地 HEAD 与远端 master 均为 8d78e2685db2cb6b6781a1818f1b76d38bd49384。
+- 本地 parent/pom.xml、all/src/main/resources/app-dev.properties 有未提交修改；平台打包不会包含这些修改。
+
+备份与验证：
+- 脚本：doc/scripts/tanliao-server/tanliao-server-ECR镜像打包.sh。
+- 可重复执行的配置 SQL：doc/sql/ci_config_tanliao_server_artifact.sql。
+- SQL 同时保存脚本正文；修改脚本备份后应同步 SQL 中的正文，再执行 SQL 回写数据库。
+- SQL 已执行成功，已回读核对项目、应用、两条打包配置及仓库同步范围。
+- bash -n 语法检查通过。
+- 使用真实项目打包脚本和模拟工具验证：后端、前端、Maven 失败、AWS 失败、非法版本、错误模块、Java 17 拒绝，共 7 项通过。
+- 模拟验证没有执行真实 Maven/npm 构建、Docker 构建、镜像推送或服务器部署。
+
+测试环境 CI：
+- #27：tio-site-all，分支 master，部署目录 /opt/tanliao/server/java。
+- #28：pc-html，分支 master，部署目录 /opt/tanliao/server/html。
+- 发布脚本：tanliao-server-测试环境部署，ID 17。
+- 服务器：192.168.5.4，用户 tjx，SSH 端口 22；复用 tanliao 已保存的凭据。
+- 凭据通过数据库内部复制，没有写入 SQL、文档或脚本文件。
+- API：21008；前端：21009；WebSocket：21010；App TCP：21011。
+- View 预留 21012，是否启动沿用仓库 start.view 配置（当前关闭）。
+- 已只读登录确认 Java 8、Python 3 和部署工具可用，21008-21012 当时均未监听。
+- 执行后前端地址：http://192.168.5.4:21009；请先执行后端 CI，再执行前端 CI。
+- 前端编译变量 VUE_APP_apiCtx=/mytio，Python 将 /mytio 同源请求转发至 127.0.0.1:21008。
+- VUE_APP_wsCtx=ws://192.168.5.4:21010，浏览器直接连接后端 WebSocket。
+- 后端部署 lib 和 config，以 org.tio.sitexxx.all.Starter 启动，使用 Java 8。
+- 仅修改待上传产物的 dev 配置、端口、客户端公布地址、日志和数据库备份目录。
+- 数据库及 Redis 连接沿用远端 master 的 dev 配置；不复制本机未提交修改。
+- 控制台日志：/opt/tanliao/server/logs/java.log、html.log。
+- 后端文件日志：/opt/tanliao/server/logs/backend；数据库备份：/opt/tanliao/server/data/mysqlbackup。
+- PID：/opt/tanliao/server/run/java.pid、html.pid。
+- 首次执行需要 SSH 用户能创建并写入 /opt/tanliao/server。
+- 后端启动检查 API、WebSocket、App TCP 均由当前进程监听；不代表业务流程全部正常。
+- 进程使用 nohup 启动，没有配置机器重启后自动启动。
+- 脚本备份：doc/scripts/tanliao-server/tanliao-server-测试环境部署.sh。
+- 可重复执行的配置 SQL：doc/sql/ci_config_tanliao_server_test.sql；依赖已有 tanliao 测试服务器参考配置。
+- 已验证后端/前端打包配置、Maven 失败中止、错误模块/端口/目录拒绝、嵌入 HTTP 服务语法及 /mytio POST 转发。
+- 已回读数据库核对 #27/#28 及 SSH 凭据复用状态；本次没有触发实际 CI 部署。
+
+2026-11-12：适配最新 master 的 dev 配置
+- 延续原端口：API 21008、前端 21009、WebSocket 21010、APP TCP 21011、View 21012。
+- 延续原目录：后端 /opt/tanliao/server/java，前端 /opt/tanliao/server/html。
+- app-dev.properties 在 app.properties 之后加载，发布时同步覆盖两处端口，避免源码中的 6060/9325/9326 覆盖 CI 配置。
+- dev 的 site 更新为 http://192.168.5.4:21009，Cookie 域名留空，上传目录为 /opt/tanliao/server/upload。
+- FRONTEND_PORT 默认 21009；仅用于后端公布站点入口，前端实际监听仍由前端 CI 的 SERVER_PORT 决定。
+- 沿用 tanliao-admin 的 Java 8 + Python 直接部署方式；前端同源代理 /mytio 到 127.0.0.1:21008，WebSocket 直连 21010。
+- CI #27/#28 点击“运行”后拉取 GitHub master、编译、上传、重启对应模块；先后端，后前端。
+- 本机 pc-html 未提交修改不会进入 CI；无需依赖本机未提交的 build:test 或 nginx/test.conf。
+- 回归验证：python3 scripts/tests/test_tanliao_server_deploy.py；覆盖 dev 配置优先级、前端构建变量、SQL 与脚本一致性。
+
+2026-11-12：修复 Java 8 CI 的 invalid target release: 17
+- 原 RELEASE 上级 tio-parent 使用 jdk.version=17 配置编译插件，项目的 maven.compiler.source/target=1.8 无法覆盖插件里的显式配置。
+- CI 在平台工作副本中将 tio-zoo-parent 切换为 tanliao-admin 已使用的 3.8.6.v20240801-tanliao-jdk8-1，沿用 Java 8 兼容的 t-io 及日志等依赖。
+- 两次 Maven 构建均显式传入 -Djdk.version=1.8；parent reactor 不传 -P linux，all 模块保留 linux profile。
+- 不修改本机 tanliao-server 源码；每次 CI 拉取 master 后自动应用兼容处理。
+- 端口、目录和 SSH 配置沿用原设置。
+- 已在 aquarpord 的独立临时工作副本中，以平台相同 root 账户、Java 8、Maven settings 和缓存完成真实构建：parent 的 15 个模块全部成功，all 打包成功，lib/config 产物检查通过。
+- 修复已写入平台发布脚本 #17，并回读校验正文一致；4 项本地回归检查通过。本次验证未上传或重启业务应用。
+
+2026-11-12：前端 npm 安装兼容修复
+- master 6c31d0b 的 package.json 声明 cli-service 5.0.6，但插件、less-loader 和 npm 锁文件仍对应 Vue CLI 4 / Webpack 4，导致 ERESOLVE。
+- 目标仓库 package.json 已恢复 cli-service ^4.5.0，移除多余的直接 webpack-dev-server 声明，沿用 package-lock.json 锁定的 4.5.19 / Webpack 4.47.0，并从 npm 锁文件重新生成 pnpm 锁文件。
+- 平台 CI 对旧 master 的这两处依赖声明执行相同修正；源码修复推送后此处理自动跳过。
+- 目标机器系统 npm 8.5.1 另有 make-fetch-happen 缓存内部异常 Cannot read property 'insert' of undefined；检测到该版本时，仅本次构建下载并使用官方 npm 8.19.4，保留平台缓存与 npmrc，全局工具不变。
+- 目标机器 npm 官方仓库连通性及多项依赖下载返回 HTTP 200，没有发现 DNS、连接或下载超时错误。
+- 已在目标机器独立临时副本验证 npm ci 成功安装 1776 个依赖，npm run build 产出 dist；本次不上传、不重启应用。
+- 更新后的完整 CI 前端构建片段也已在目标机器验证通过，修复已写入平台发布脚本 #17，并回读核对正文一致。
