@@ -1,5 +1,18 @@
+{{define "docker_deployment_group"}}
+<tr class="ci-config-group-row expanded">
+    <td>
+        <button type="button" class="ci-config-toggle" aria-expanded="true" aria-label="展开或收起项目" onclick="toggleCIConfigGroup(this)">
+            <span class="chevron">›</span>
+        </button>
+    </td>
+    <td colspan="7">{{.ProjectName}} <span class="badge">{{len .Mappings}} 个发布映射</span></td>
+</tr>
+{{range .Mappings}}{{template "docker_deployment_row" .}}{{end}}
+{{end}}
+
 {{define "docker_deployment_row"}}
-<tr id="docker-deployment-{{.ID}}">
+<tr id="docker-deployment-{{.ID}}" class="ci-config-module-row is-visible">
+    <td></td>
     <td>
         <div class="ci-config-module-name">{{.ComposeServiceName}}</div>
         <div class="ci-config-module-path">{{if .ScriptID}}{{.ScriptID}}{{else}}Docker Compose{{end}}</div>
@@ -39,6 +52,10 @@
         <div class="actions">
             <button class="primary" onclick="runArtifactDeploy({{.ID}})" {{if not .Enabled}}disabled{{end}}>发布</button>
             <button onclick="openArtifactDeployLatestLog({{.ID}})">全量日志</button>
+            {{if eq (deref .LastDeployStatus) "running"}}
+            <button class="danger" hx-post="/docker-deployments/{{.ID}}/reset"
+                    hx-confirm="重置会将本次发布及日志标为失败，允许重新发布，但不会终止远端命令。请确认任务已停止或卡死，确定重置状态？">重置状态</button>
+            {{end}}
             <a href="/applications/{{.ApplicationID}}/logs" class="btn">操作日志</a>
             <button onclick="openEditModal('/docker-deployments/{{.ID}}/edit')">编辑</button>
             <button class="danger" hx-delete="/docker-deployments/{{.ID}}" hx-confirm="确定要删除发布映射&quot;{{.ComposeServiceName}}&quot;吗？">删除</button>

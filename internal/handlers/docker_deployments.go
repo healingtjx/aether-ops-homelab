@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,6 +29,30 @@ type DockerDeploymentHandler struct {
 	db         *pgxpool.Pool
 	rdr        *templates.Renderer
 	runStore   *artifactDeployRunStore
+}
+
+type dockerDeploymentGroup struct {
+	ProjectID   int64
+	ProjectName string
+	Mappings    []models.DockerDeployMapping
+}
+
+func groupDockerDeployments(mappings []models.DockerDeployMapping) []dockerDeploymentGroup {
+	groups := make([]dockerDeploymentGroup, 0)
+	groupIndex := make(map[int64]int)
+	for _, mapping := range mappings {
+		idx, ok := groupIndex[mapping.ProjectID]
+		if !ok {
+			idx = len(groups)
+			groupIndex[mapping.ProjectID] = idx
+			groups = append(groups, dockerDeploymentGroup{
+				ProjectID:   mapping.ProjectID,
+				ProjectName: mapping.ProjectName,
+			})
+		}
+		groups[idx].Mappings = append(groups[idx].Mappings, mapping)
+	}
+	return groups
 }
 
 type artifactDeployRun struct {
@@ -54,6 +80,7 @@ func (h *DockerDeploymentHandler) Register(r chi.Router) {
 	r.Get("/docker-deployments/{id}/run/confirm", h.RunConfirm)
 	r.Post("/docker-deployments/{id}/run/prepare", h.RunPrepare)
 	r.Get("/docker-deployments/{id}/run/stream", h.RunStream)
+	r.Post("/docker-deployments/{id}/reset", h.ResetStatus)
 	r.Delete("/docker-deployments/{id}", h.Delete)
 }
 
@@ -120,7 +147,7 @@ func (h *DockerDeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.rdr.Page(w, r, "docker_deployments_page", map[string]any{
-		"Mappings":     mappings,
+		"Groups":       groupDockerDeployments(mappings),
 		"CIConfigs":    configs,
 		"Registries":   registries,
 		"Repositories": repositories,
@@ -334,7 +361,7 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if mapping.LastDeployStatus != nil && *mapping.LastDeployStatus == "running" {
-		http.Error(w, "该映射正在发布中，请稍后", http.StatusConflict)
+		http.Error(w, models.ErrDockerDeployRunning.Error(), http.StatusConflict)
 		return
 	}
 	artifact, err := models.GetArtifact(r.Context(), h.db, run.ArtifactID)
@@ -352,7 +379,7 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	flusher, ok := w.(http.Flusher)
+	_, ok = w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
@@ -361,9 +388,21 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
+	streamOK := true
+	controller := http.NewResponseController(w)
 	sendSSE := func(event, data string) {
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
-		flusher.Flush()
+		if !streamOK {
+			return
+		}
+		_ = controller.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		defer controller.SetWriteDeadline(time.Time{})
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data); err != nil {
+			streamOK = false
+			return
+		}
+		if err := controller.Flush(); err != nil {
+			streamOK = false
+		}
 	}
 
 	var userID int64
@@ -371,7 +410,7 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		userID = u.ID
 	}
 	imageRef := artifact.ImageRef()
-	opLog, _ := models.CreateOperationLogWithDetail(r.Context(), h.db, mapping.ApplicationID, mapping.ProjectID, "artifact_deploy", userID, models.OperationLogDetail{
+	opLog, err := models.CreateOperationLogWithDetail(r.Context(), h.db, mapping.ApplicationID, mapping.ProjectID, "artifact_deploy", userID, models.OperationLogDetail{
 		CIConfigID:         mapping.CIConfigID,
 		ReleaseBranch:      mapping.ReleaseBranch,
 		ModuleName:         mapping.ModuleName,
@@ -381,22 +420,50 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		ComposeServiceName: mapping.ComposeServiceName,
 		DeployRemoteDir:    mapping.RemoteDir,
 	})
-	deployRun, err := models.CreateDockerDeployRun(r.Context(), h.db, id, opLog.ID, artifact.ID, imageRef)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	deployRun, err := models.CreateDockerDeployRun(r.Context(), h.db, id, opLog.ID, artifact.ID, imageRef)
+	if err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, updateErr := models.UpdateOperationLogStatus(ctx, h.db, opLog.ID, "failed", err.Error()); updateErr != nil {
+			log.Printf("finish rejected deployment log %d: %v", opLog.ID, updateErr)
+		}
+		code := http.StatusInternalServerError
+		if errors.Is(err, models.ErrDockerDeployRunning) {
+			code = http.StatusConflict
+		}
+		http.Error(w, err.Error(), code)
+		return
+	}
+	status, message := "failed", "发布异常中断"
+	finished := false
+	finishRun := func() {
+		if finished {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := models.FinishDockerDeployment(ctx, h.db, id, deployRun.ID, status, message); err != nil {
+			log.Printf("finish deployment %d: %v", deployRun.ID, err)
+		} else {
+			finished = true
+		}
+	}
+	defer finishRun()
 	lineNo := 0
 	sendLog := func(message string) {
 		sendSSE("log", message)
 		lineNo++
-		_, _ = models.CreateDockerDeployRunLog(context.Background(), h.db, deployRun.ID, lineNo, message)
-	}
-	finishRun := func(status, message string) {
-		_, _ = models.UpdateDockerDeployRunStatus(context.Background(), h.db, deployRun.ID, status, message)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := models.CreateDockerDeployRunLog(ctx, h.db, deployRun.ID, lineNo, message); err != nil {
+			log.Printf("persist deployment %d log: %v", deployRun.ID, err)
+		}
 	}
 
-	models.UpdateDockerDeployStatus(context.Background(), h.db, id, "running", "")
 	ciConfig, err := models.GetCIConfig(r.Context(), h.db, mapping.CIConfigID)
 	var sshConfig dockerdeploy.SSHConfig
 	if err == nil {
@@ -407,11 +474,9 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		sshConfig, err = dockerdeploy.LoadSSHConfigForDeployment(values)
 	}
 	if err != nil {
-		msg := err.Error()
-		models.UpdateOperationLogStatus(context.Background(), h.db, opLog.ID, "failed", msg)
-		models.UpdateDockerDeployStatus(context.Background(), h.db, id, "failed", msg)
-		sendLog(msg)
-		finishRun("failed", msg)
+		message = err.Error()
+		sendLog(message)
+		finishRun()
 		sendSSE("done", "failed")
 		return
 	}
@@ -438,19 +503,40 @@ func (h *DockerDeploymentHandler) RunStream(w http.ResponseWriter, r *http.Reque
 		RegistryCredential: registry.Credential,
 	}, logFn)
 
-	status := result.Status
-	message := result.Message
+	status = result.Status
+	message = result.Message
 	if err != nil {
 		status = "failed"
 		message = err.Error()
 	}
-	models.UpdateOperationLogStatus(context.Background(), h.db, opLog.ID, status, message)
-	models.UpdateDockerDeployStatus(context.Background(), h.db, id, status, message)
+	if status != "success" && status != "failed" {
+		status, message = "failed", "发布返回了无效状态"
+	}
 	if message != "" {
 		sendLog(message)
 	}
-	finishRun(status, message)
+	finishRun()
 	sendSSE("done", status)
+}
+
+func (h *DockerDeploymentHandler) ResetStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := models.ResetDockerDeployment(ctx, h.db, id); err != nil {
+		code := http.StatusInternalServerError
+		if errors.Is(err, pgx.ErrNoRows) {
+			code = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), code)
+		return
+	}
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *DockerDeploymentHandler) LatestRunLog(w http.ResponseWriter, r *http.Request) {

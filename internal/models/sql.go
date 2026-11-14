@@ -270,6 +270,32 @@ SET status = $2,
     finished_at = NOW()
 WHERE id = $1`
 
+	// Deletion and stale-status recovery share a single atomic statement. A
+	// historical log must never reset a newer CI/build run's status.
+	sqlDeleteOperationLog = `
+WITH deleted AS (
+    DELETE FROM operation_logs WHERE id = $1
+    RETURNING id, ci_config_id, operation_type, status
+), released AS (
+    UPDATE ci_configs cc
+    SET last_run_status = 'failed',
+        last_run_message = '运行中日志已被手动删除，已解除运行状态',
+        updated_at = NOW()
+    FROM deleted d
+    WHERE cc.id = d.ci_config_id
+      AND d.status = 'running'
+      AND d.operation_type IN ('deploy', 'artifact_build')
+      AND cc.last_run_status = 'running'
+      AND NOT EXISTS (
+          SELECT 1 FROM operation_logs newer
+          WHERE newer.ci_config_id = d.ci_config_id
+            AND newer.operation_type IN ('deploy', 'artifact_build')
+            AND newer.id > d.id
+      )
+    RETURNING cc.id
+)
+SELECT id FROM deleted`
+
 	sqlGetOperationLog = `
 SELECT ol.id, ol.application_id, a.name AS application_name,
        ol.project_id, p.name AS project_name,

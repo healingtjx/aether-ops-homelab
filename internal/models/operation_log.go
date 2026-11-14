@@ -106,6 +106,16 @@ func GetOperationLog(ctx context.Context, db *pgxpool.Pool, id int64) (Operation
 	return pgx.CollectOneRow(rows, pgx.RowToStructByName[OperationLog])
 }
 
+// DeleteOperationLog also releases a stale CI/build status when this is the
+// latest run for that configuration. It does not terminate executing processes.
+func DeleteOperationLog(ctx context.Context, db *pgxpool.Pool, id int64) error {
+	var deletedID int64
+	if err := queryRow(ctx, db, sqlDeleteOperationLog, id).Scan(&deletedID); err != nil {
+		return fmt.Errorf("delete operation log: %w", err)
+	}
+	return nil
+}
+
 func ListOperationLogs(ctx context.Context, db *pgxpool.Pool, projectID int64, applicationID int64, limit int, offset int) ([]OperationLog, error) {
 	sql, args := buildListOperationLogsSQL(projectID, applicationID, limit, offset)
 	rows, err := queryRows(ctx, db, sql, args...)

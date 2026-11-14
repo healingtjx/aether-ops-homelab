@@ -29,5 +29,9 @@
     <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{or "" .Message}}">{{or "-" .Message}}</td>
     <td style="white-space:nowrap">{{formatTimeFull .StartedAt}}</td>
     <td style="white-space:nowrap">{{formatTimeFull .FinishedAt}}</td>
+    <td>
+        <button class="danger" hx-delete="/operation-logs/{{.ID}}" hx-swap="none"
+                hx-confirm="{{if eq .Status "running"}}删除不会终止后台进程；若为当前 CI / 打包任务，还会解除其运行状态。请确认任务已停止或卡死。确定删除此日志？{{else}}确定删除此操作日志？{{end}}">删除</button>
+    </td>
 </tr>
 {{end}}

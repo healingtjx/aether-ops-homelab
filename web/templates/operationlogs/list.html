@@ -34,10 +34,10 @@
 {{define "operation_logs_results"}}
 <div id="operation-logs-results">
     <table>
-        <thead><tr><th>项目</th><th>应用</th><th>发布信息</th><th>操作</th><th>状态</th><th>操作人</th><th>消息</th><th>开始时间</th><th>完成时间</th></tr></thead>
+        <thead><tr><th>项目</th><th>应用</th><th>发布信息</th><th>操作</th><th>状态</th><th>操作人</th><th>消息</th><th>开始时间</th><th>完成时间</th><th>管理</th></tr></thead>
         <tbody id="logs-table-body">
             {{range .Logs}}{{template "operation_log_row" .}}{{else}}
-            <tr><td colspan="9" style="color:#868e96;text-align:center">暂无操作日志</td></tr>
+            <tr><td colspan="10" style="color:#868e96;text-align:center">暂无操作日志</td></tr>
             {{end}}
         </tbody>
     </table>
